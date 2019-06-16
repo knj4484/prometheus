@@ -1,17 +1,15 @@
 ---
-title: Template examples
+title: テンプレートの例
 sort_rank: 4
 ---
 
-# Template examples
+# テンプレートの例
 
-Prometheus supports templating in the annotations and labels of alerts,
-as well as in served console pages. Templates have the ability to run
-queries against the local database, iterate over data, use conditionals,
-format data, etc. The Prometheus templating language is based on the [Go
-templating](https://golang.org/pkg/text/template/) system.
+Prometheusは、コンソールページと同様に、アラートのアノテーションとラベルでテンプレートをサポートしている。
+テンプレートで、ローカルのデータベースに対してクエリを実行したり、繰り返し処理、条件分岐、フォーマットなどをすることが出来る。
+Prometheusのテンプレート言語は[Goのテンプレートシステム](https://golang.org/pkg/text/template/)に基づいている。
 
-## Simple alert field templates
+## 簡単なアラートのフィールドのテンプレート
 
 ```
 alert: InstanceDown
@@ -24,14 +22,12 @@ annotations:
   description: "{{$labels.instance}} of job {{$labels.job}} has been down for more than 5 minutes."
 ```
 
-Alert field templates will be executed during every rule iteration for each
-alert that fires, so keep any queries and templates lightweight. If you have a
-need for more complicated templates for alerts, it is recommended to link to a
-console instead.
+アラートのフィールドのテンプレートは、起きたアラートそれぞれに対して各ルールに対する反復処理の中で実行されるので、どのクエリも軽量に保つこと。
+アラートのためにより込み入ったテンプレート必要な場合、代わりにコンソールへリンクすることを推奨する。
 
-## Simple iteration
+## 単純な繰り返し
 
-This displays a list of instances, and whether they are up:
+インスタンスのリストとそれがupかどうかのリストを表示する。
 
 ```go
 {{ range query "up" }}
@@ -39,9 +35,9 @@ This displays a list of instances, and whether they are up:
 {{ end }}
 ```
 
-The special `.` variable contains the value of the current sample for each loop iteration.
+特殊変数`.`は、各ループでのサンプル値が含まれる。
 
-## Display one value
+## 値の表示
 
 ```go
 {{ with query "some_metric{instance='someinstance'}" }}
@@ -49,14 +45,12 @@ The special `.` variable contains the value of the current sample for each loop 
 {{ end }}
 ```
 
-Go and Go's templating language are both strongly typed, so one must check that
-samples were returned to avoid an execution error. For example this could
-happen if a scrape or rule evaluation has not run yet, or a host was down.
+GoおよびGoのテンプレート言語はどちらも強く型付けされているので、実行エラーを避けるためにサンプルが返されたことをチェックしなければならない。
+例えば、スクレイプやルールの評価がまだ実行されていないあるいはホストがダウンしている場合にこうしたことが起きる。
 
-The included `prom_query_drilldown` template handles this, allows for
-formatting of results, and linking to the [expression browser](https://prometheus.io/docs/visualization/browser/).
+インクルードされたテンプレート`prom_query_drilldown`はこの処理をし、結果をフォーマットし、[expressionブラウザ](https://prometheus.io/docs/visualization/browser/)にリンクする。
 
-## Using console URL parameters
+## コンソールURLパラメーターの利用
 
 ```go
 {{ with printf "node_memory_MemTotal{job='node',instance='%s'}" .Params.instance | query }}
@@ -64,9 +58,9 @@ formatting of results, and linking to the [expression browser](https://prometheu
 {{ end }}
 ```
 
-If accessed as `console.html?instance=hostname`, `.Params.instance` will evaluate to `hostname`.
+`console.html?instance=hostname`としてアクセスされると、`.Params.instance`は、`hostname`になる。
 
-## Advanced iteration
+## 高度な反復処理
 
 ```html
 <table>
@@ -83,17 +77,14 @@ If accessed as `console.html?instance=hostname`, `.Params.instance` will evaluat
 <table>
 ```
 
-Here we iterate over all network devices and display the network traffic for each.
+ここでは、全ネットワークデバイスについて反復処理をして、それぞれのネットワークトラフィックを表示している。
 
-As the `range` action does not specify a variable, `.Params.instance` is not
-available inside the loop as `.` is now the loop variable.
+`range`アクションが変数を指定していないので、`.`がループ変数となり、ループ内では`.Params.instance`は利用できない。
 
-## Defining reusable templates
+## 再利用可能なテンプレートの定義
 
-Prometheus supports defining templates that can be reused. This is particularly
-powerful when combined with
-[console library](template_reference.md#console-templates) support, allowing
-sharing of templates across consoles.
+Prometheusは、再利用可能なテンプレートの定義をサポートしている。
+これは[コンソールライブラリ](template_reference.md#console-templates)と組み合わせると特に強力で、複数のコンソールにまたがってテンプレートを共有出来るようになる。
 
 ```go
 {{/* Define the template */}}
@@ -105,7 +96,7 @@ sharing of templates across consoles.
 {{template "myTemplate"}}
 ```
 
-Templates are limited to one argument. The `args` function can be used to wrap multiple arguments.
+テンプレートは、引数が1つに制限されている。複数の引数をまとめるために、関数`args`を利用することが出来る。
 
 ```go
 {{define "myMultiArgTemplate"}}

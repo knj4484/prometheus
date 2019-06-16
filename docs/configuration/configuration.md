@@ -1,107 +1,97 @@
 ---
-title: Configuration
+title: 設定
 sort_rank: 1
 ---
 
-# Configuration
+# 設定
 
-Prometheus is configured via command-line flags and a configuration file. While
-the command-line flags configure immutable system parameters (such as storage
-locations, amount of data to keep on disk and in memory, etc.), the
-configuration file defines everything related to scraping [jobs and their
-instances](https://prometheus.io/docs/concepts/jobs_instances/), as well as
-which [rule files to load](recording_rules.md#configuring-rules).
+Prometheusは、コマンドラインフラグと設定ファイルを通して設定される。
+コマンドラインフラグは、不変のシステムパラメーター（ストレージの場所、ディスクやメモリに保持するデータ量など）を設定し、設定ファイルは、どの[ルールファイル]((recording_rules.md#configuring-rules))を読み込むかに加えて、スクレイピングの[ジョブとインスタンス](https://prometheus.io/docs/concepts/jobs_instances/)に関する全てを定義する。
 
-To view all available command-line flags, run `./prometheus -h`.
+利用可能な全てのコマンドラインフラグを見るには、`./prometheus -h`を実行する。
 
-Prometheus can reload its configuration at runtime. If the new configuration
-is not well-formed, the changes will not be applied.
-A configuration reload is triggered by sending a `SIGHUP` to the Prometheus process or
-sending a HTTP POST request to the `/-/reload` endpoint (when the `--web.enable-lifecycle` flag is enabled).
-This will also reload any configured rule files.
+Prometheusは、実行時に設定を読み込み直すことが出来る。
+もし、新しい設定が正しい形式でなければ、変更は適用されない。
+設定を読み込み直させるには、Prometheusプロセスに`SIGHUP`を送るか、（`--web.enable-lifecycle`フラグが有効な場合）エンドポイント`/-/reload`にHTTP POSTリクエストを送る。
 
-## Configuration file
+## 設定ファイル
 
-To specify which configuration file to load, use the `--config.file` flag.
+どの設定ファイルを読み込むか指定するには、フラグ`--config.file`を使う。
 
-The file is written in [YAML format](https://en.wikipedia.org/wiki/YAML),
-defined by the scheme described below.
-Brackets indicate that a parameter is optional. For non-list parameters the
-value is set to the specified default.
+設定ファイルは、以下に記すスキームで定義された[YAML形式](https://ja.wikipedia.org/wiki/YAML)で書かれる。
+ブラケットは、パラメーターがオプションであることを表す。
+リストでないパラメーターは、指定されたデフォルト値にセットされる。
 
-Generic placeholders are defined as follows:
+一般的なプレースホルダーは以下の通り。
 
-* `<boolean>`: a boolean that can take the values `true` or `false`
-* `<duration>`: a duration matching the regular expression `[0-9]+(ms|[smhdwy])`
-* `<labelname>`: a string matching the regular expression `[a-zA-Z_][a-zA-Z0-9_]*`
-* `<labelvalue>`: a string of unicode characters
-* `<filename>`: a valid path in the current working directory
-* `<host>`: a valid string consisting of a hostname or IP followed by an optional port number
-* `<path>`: a valid URL path
-* `<scheme>`: a string that can take the values `http` or `https`
-* `<string>`: a regular string
-* `<secret>`: a regular string that is a secret, such as a password
-* `<tmpl_string>`: a string which is template-expanded before usage
+* `<boolean>`: 値として`true`または`false`を取ることが出来るブーリアン
+* `<duration>`: 正規表現`[0-9]+(ms|[smhdwy])`にマッチする時間幅
+* `<labelname>`: 正規表現`[a-zA-Z_][a-zA-Z0-9_]*`にマッチする文字列
+* `<labelvalue>`: Unicodeの文字列
+* `<filename>`: ワーキングディレクトリ内のパス
+* `<host>`: ホスト名またはIP、オプションでポート番号から成る文字列
+* `<path>`: URLパス
+* `<scheme>`: 値として`http`または`https`を取ることが出来る文字列
+* `<string>`: 文字列
+* `<secret>`: パスワードのような秘密の文字列
+* `<tmpl_string>`: 利用前にテンプレートで展開される文字列
 
-The other placeholders are specified separately.
+そのほかのプレースホルダーは、個別に定義される。
 
-A valid example file can be found [here](/config/testdata/conf.good.yml).
+[ここ](https://github.com/prometheus/prometheus/blob/release-2.9/config/testdata/conf.good.yml)でサンプルファイルを見ることが出来る。
 
-The global configuration specifies parameters that are valid in all other configuration
-contexts. They also serve as defaults for other configuration sections.
+グローバルな設定は、他の全ての部分で有効なパラメーターを指定する。
+これらは、他の部分での設定のデフォルト値にもなる。
 
 ```yaml
 global:
-  # How frequently to scrape targets by default.
+  # デフォルトでターゲットをスクレイプする頻度
   [ scrape_interval: <duration> | default = 1m ]
 
-  # How long until a scrape request times out.
+  # スクレイプのリクエストがタイムアウトするまでの時間
   [ scrape_timeout: <duration> | default = 10s ]
 
-  # How frequently to evaluate rules.
+  # ルールを評価する頻度
   [ evaluation_interval: <duration> | default = 1m ]
 
-  # The labels to add to any time series or alerts when communicating with
-  # external systems (federation, remote storage, Alertmanager).
+  # 外部システム（federation、remote storage、Alertmanager）と通信するときに
+  # 全ての時系列やアラートに追加するラベル
   external_labels:
     [ <labelname>: <labelvalue> ... ]
 
-# Rule files specifies a list of globs. Rules and alerts are read from
-# all matching files.
+# ルールファイルはグロブのリストを指定する。
+# マッチした全てのファイルからルールとアラートが読み込まれる
 rule_files:
   [ - <filepath_glob> ... ]
 
-# A list of scrape configurations.
+# スクレイプの設定のリスト
 scrape_configs:
   [ - <scrape_config> ... ]
 
-# Alerting specifies settings related to the Alertmanager.
+# alertingはAlertmanagerに関する設定をする
 alerting:
   alert_relabel_configs:
     [ - <relabel_config> ... ]
   alertmanagers:
     [ - <alertmanager_config> ... ]
 
-# Settings related to the remote write feature.
+# remote write機能に関する設定
 remote_write:
   [ - <remote_write> ... ]
 
-# Settings related to the remote read feature.
+# remote read機能に関する設定
 remote_read:
   [ - <remote_read> ... ]
 ```
 
 ### `<scrape_config>`
 
-A `scrape_config` section specifies a set of targets and parameters describing how
-to scrape them. In the general case, one scrape configuration specifies a single
-job. In advanced configurations, this may change.
+`scrape_config`セクションは、監視対象とそれらをどのようにscrapeするかを表すパラメーターの集合である。
+一般的なケースでは、一つのscrapeの設定が一つのジョブを指定する。高度な設定ではそうでない場合もある。
 
-Targets may be statically configured via the `static_configs` parameter or
-dynamically discovered using one of the supported service-discovery mechanisms.
+監視対象は、`static_configs`によって静的に設定されることも、サービスディスカバリーの仕組みによって動的に設定されることもある。
 
-Additionally, `relabel_configs` allow advanced modifications to any
-target and its labels before scraping.
+`relabel_configs`によって、スクレイプする前に任意の対象・ラベルを変更することが可能である。
 
 ```yaml
 # The job name assigned to scraped metrics by default.
@@ -116,23 +106,21 @@ job_name: <job_name>
 # The HTTP resource path on which to fetch metrics from targets.
 [ metrics_path: <path> | default = /metrics ]
 
-# honor_labels controls how Prometheus handles conflicts between labels that are
-# already present in scraped data and labels that Prometheus would attach
-# server-side ("job" and "instance" labels, manually configured target
-# labels, and labels generated by service discovery implementations).
+# honor_labelsは、取得したデータにすでにあるラベルとPrometheusが付与しようとしている
+# サーバーサイドのラベル（jobやinstance、手動で設定されたラベル、サービスディスカバリー
+# で生成されたラベル）の衝突を制御する
 #
-# If honor_labels is set to "true", label conflicts are resolved by keeping label
-# values from the scraped data and ignoring the conflicting server-side labels.
+# honor_labelsがtrueの場合、取得したデータのラベルの値を保持し、衝突しているサーバーサ
+# イドのラベルを無視することで衝突を解決する
 #
-# If honor_labels is set to "false", label conflicts are resolved by renaming
-# conflicting labels in the scraped data to "exported_<original-label>" (for
-# example "exported_instance", "exported_job") and then attaching server-side
-# labels. This is useful for use cases such as federation, where all labels
-# specified in the target should be preserved.
+# honor_labelsがfalseの場合、取得したデータにある衝突しているラベルを
+# "exported_<original-label>"（例えばexported_instance、exported_job）という名前に変更
+# してからサーバーサイドのラベルを付与することで衝突を解決する。これは、federationのような、対象
+# の全てのラベルを保持しなければいけないユースケースで便利である。
 #
-# Note that any globally configured "external_labels" are unaffected by this
-# setting. In communication with external systems, they are always applied only
-# when a time series does not have a given label yet and are ignored otherwise.
+# グローバルに設定された"external_labels"は、この設定に影響されないことに注意すること。
+# 外部システムとのやりとりでは、それらは必ず時系列データにそのラベルがまだない場合にのみ適用され、
+# そうでない場合は無視される。
 [ honor_labels: <boolean> | default = false ]
 
 # Configures the protocol scheme used for requests.
@@ -142,20 +130,19 @@ job_name: <job_name>
 params:
   [ <string>: [<string>, ...] ]
 
-# Sets the `Authorization` header on every scrape request with the
-# configured username and password.
-# password and password_file are mutually exclusive.
+# 設定されたusernameとpasswordでscrapeのリクエストの`Authorization`ヘッダを毎回セットする。
+# passwordとpassword_fileは相互排他的である。
 basic_auth:
   [ username: <string> ]
   [ password: <secret> ]
   [ password_file: <string> ]
 
-# Sets the `Authorization` header on every scrape request with
-# the configured bearer token. It is mutually exclusive with `bearer_token_file`.
+# 設定された署名なしトークン (Bearer Token)でscrapeのリクエストの`Authorization`ヘッダを
+# 毎回セットする。`bearer_token_file`と相互排他的である。
 [ bearer_token: <secret> ]
 
-# Sets the `Authorization` header on every scrape request with the bearer token
-# read from the configured file. It is mutually exclusive with `bearer_token`.
+# 設定ファイルから読み込んだ署名なしトークン (Bearer Token)でscrapeのリクエストの
+# `Authorization`ヘッダを毎回セットする。`bearer_token`と相互排他的である。
 [ bearer_token_file: /path/to/bearer/token/file ]
 
 # Configures the scrape request's TLS settings.
@@ -225,31 +212,30 @@ relabel_configs:
 metric_relabel_configs:
   [ - <relabel_config> ... ]
 
-# Per-scrape limit on number of scraped samples that will be accepted.
-# If more than this number of samples are present after metric relabelling
-# the entire scrape will be treated as failed. 0 means no limit.
+# スクレイプ毎に受け付けるサンプル数の限界値。もしリラベルした後にこの値より多いサンプルに
+# なったらスクレイプ全体が失敗として扱われる。0は制限なしを意味する
 [ sample_limit: <int> | default = 0 ]
 ```
 
-Where `<job_name>` must be unique across all scrape configurations.
+ここで、`<job_name>`は全てのスクレイプの設定にまたがってユニークでなければならない。
 
 ### `<tls_config>`
 
-A `tls_config` allows configuring TLS connections.
+`tls_config`によって、TLS接続の設定ができる。
 
 ```yaml
-# CA certificate to validate API server certificate with.
+# APIサーバーを証明するためのCA証明書
 [ ca_file: <filename> ]
 
-# Certificate and key files for client cert authentication to the server.
+# クライアント証明書を認証するための証明書と鍵ファイル
 [ cert_file: <filename> ]
 [ key_file: <filename> ]
 
-# ServerName extension to indicate the name of the server.
+# Server Name Indicationのためのサーバー名
 # https://tools.ietf.org/html/rfc4366#section-3.1
 [ server_name: <string> ]
 
-# Disable validation of the server certificate.
+# サーバー証明書の検証の無効化
 [ insecure_skip_verify: <boolean> ]
 ```
 
@@ -369,35 +355,30 @@ metadata and a single tag).
 
 ### `<dns_sd_config>`
 
-A DNS-based service discovery configuration allows specifying a set of DNS
-domain names which are periodically queried to discover a list of targets. The
-DNS servers to be contacted are read from `/etc/resolv.conf`.
+DNSベースのサービスディスカバリーの設定によって、ターゲットのリストを検出するために検索されるDNSドメイン名の集合を指定することができる。
+通信するDNSサーバーは、`/etc/resolv.conf`から読み込まれる。
 
-This service discovery method only supports basic DNS A, AAAA and SRV record
-queries, but not the advanced DNS-SD approach specified in
-[RFC6763](https://tools.ietf.org/html/rfc6763).
+このサービスディスカバリーの方法は、基本的なDNSのA、AAAA、SRVレコードの検索をサポートするだけで、[RFC6763](https://tools.ietf.org/html/rfc6763)で定義されているDNS-SDの方法はサポートしていない。
 
-During the [relabeling phase](#relabel_config), the meta label
-`__meta_dns_name` is available on each target and is set to the
-record name that produced the discovered target.
+[リラベル](#relabel_config)の過程で、各ターゲットでメタラベル`__meta_dns_name`が利用可能で、検出された対象を生成したレコード名にセットされる。
 
 ```yaml
-# A list of DNS domain names to be queried.
+# 検索されるドメイン名のリスト
 names:
   [ - <domain_name> ]
 
-# The type of DNS query to perform.
+# 実行するDNSクエリのタイプ
 [ type: <query_type> | default = 'SRV' ]
 
-# The port number used if the query type is not SRV.
+# クエリタイプがSRV出ない場合に使われるポート番号
 [ port: <number>]
 
-# The time after which the provided names are refreshed.
+# 与えられた名前がリフレッシュされるまでの時間
 [ refresh_interval: <duration> | default = 30s ]
 ```
 
-Where `<domain_name>` is a valid DNS domain name.
-Where `<query_type>` is `SRV`, `A`, or `AAAA`.
+`<domain_name>`は、正当なDNSドメイン名である。
+`<query_type>`は、`SRV`、`A`、`AAAA`のいずれかである。
 
 ### `<ec2_sd_config>`
 
@@ -569,15 +550,15 @@ tls_config:
 
 ### `<file_sd_config>`
 
-File-based service discovery provides a more generic way to configure static targets
-and serves as an interface to plug in custom service discovery mechanisms.
+ファイルベースのサービスディスカバリーは、静的な対象を設定するためのより一般的な方法を提供し、また
+独自のサービスディスカバリーの仕組みを組み込むためのインターフェースとして機能する。
 
-It reads a set of files containing a list of zero or more
-`<static_config>`s. Changes to all defined files are detected via disk watches
-and applied immediately. Files may be provided in YAML or JSON format. Only
-changes resulting in well-formed target groups are applied.
+ファイルベースのサービスディスカバリーは、`<static_config>`を0個以上含むファイルの集合を読み込む。
+ディスクをウォッチしているので、定義された全てのファイルの変更は即時に検知・適用される。
+ファイルはYAMLまたはJSONで記述することが可能である。
+正しい形式で書かれた対象グループになる変更のみが適用される。
 
-The JSON file must contain a list of static configs, using this format:
+JSONファイルは、下記のフォーマットで`static_config`のリストを含んでいなければいけない。
 
 ```yaml
 [
@@ -591,28 +572,24 @@ The JSON file must contain a list of static configs, using this format:
 ]
 ```
 
-As a fallback, the file contents are also re-read periodically at the specified
-refresh interval.
+指定された`refresh_interval`での定期的な再読み込みもされる。
 
-Each target has a meta label `__meta_filepath` during the
-[relabeling phase](#relabel_config). Its value is set to the
-filepath from which the target was extracted.
+各監視対象は、[リラベルの過程](#relabel_config)でメタラベル`__meta_filepath`を持つ。
+その値は、その監視対象が抽出されたファイルパスがセットされる。
 
-There is a list of
-[integrations](https://prometheus.io/docs/operating/integrations/#file-service-discovery) with this
-discovery mechanism.
+この検出の仕組みとの[連携システムの一覧](https://prometheus.io/docs/operating/integrations/#file-service-discovery)がある。
 
 ```yaml
-# Patterns for files from which target groups are extracted.
+# 対象グループを抽出するファイルのパターン
 files:
   [ - <filename_pattern> ... ]
 
-# Refresh interval to re-read the files.
+# ファイルを再読み込みする間隔
 [ refresh_interval: <duration> | default = 5m ]
 ```
 
-Where `<filename_pattern>` may be a path ending in `.json`, `.yml` or `.yaml`. The last path segment
-may contain a single `*` that matches any character sequence, e.g. `my/path/tg_*.json`.
+`<filename_pattern>`には、`.json`、`.yml`、`.yaml`で終わるパスを書くことが可能である。
+パスの最後の部分は一つの`*`を含んでよい。これによって、任意の文字列の連続（例 `my/path/tg_*.json`）にマッチする。
 
 ### `<gce_sd_config>`
 
@@ -677,14 +654,14 @@ service account and place the credential file in one of the expected locations.
 
 ### `<kubernetes_sd_config>`
 
-Kubernetes SD configurations allow retrieving scrape targets from
-[Kubernetes'](https://kubernetes.io/) REST API and always staying synchronized with
-the cluster state.
+Kubernetes SDの設定によって、[Kubernetes](https://kubernetes.io/)のREST APIからスクレイプ対象を取得でき、クラスタの状態と常に動機を保つ事が出来る。
 
-One of the following `role` types can be configured to discover targets:
+監視対象を検出するために、以下の`role`の1つを設定出来る。
 
 #### `node`
 
+`node`ロールはクラスタノードにつき1つの監視対象を、KubeletのHTTPポートをデフォルトとしたアドレスと共に検出する。
+最初の存在したアドレスKubernetesノードオブジェクト
 The `node` role discovers one target per cluster node with the address defaulting
 to the Kubelet's HTTP port.
 The target address defaults to the first existing address of the Kubernetes
@@ -1011,57 +988,44 @@ tls_config:
 
 ### `<static_config>`
 
-A `static_config` allows specifying a list of targets and a common label set
-for them.  It is the canonical way to specify static targets in a scrape
-configuration.
+`static_config`によって、監視対象のリストとそれらに共通のラベル集合を指定できる。
+スクレイプの設定の中で静的な監視対象を指定するもっとも簡潔な方法である。
 
 ```yaml
-# The targets specified by the static config.
+# 静的な設定で指定される監視対象
 targets:
   [ - '<host>' ]
 
-# Labels assigned to all metrics scraped from the targets.
+# targetsからスクレイプされた全てのメトリクスに割り当てられるラベル
 labels:
   [ <labelname>: <labelvalue> ... ]
 ```
 
 ### `<relabel_config>`
 
-Relabeling is a powerful tool to dynamically rewrite the label set of a target before
-it gets scraped. Multiple relabeling steps can be configured per scrape configuration.
-They are applied to the label set of each target in order of their appearance
-in the configuration file.
+リラベルは、監視対象のラベル集合を、スクレイプされる前に、動的に書き換えるための強力な手段である。
+スクレイプの設定毎に複数のリラベルのステップを設定できる。
+それらのステップは、各監視対象のラベル集合に、設定ファイルに出てくる順に適用される。
 
-Initially, aside from the configured per-target labels, a target's `job`
-label is set to the `job_name` value of the respective scrape configuration.
-The `__address__` label is set to the `<host>:<port>` address of the target.
-After relabeling, the `instance` label is set to the value of `__address__` by default if
-it was not set during relabeling. The `__scheme__` and `__metrics_path__` labels
-are set to the scheme and metrics path of the target respectively. The `__param_<name>`
-label is set to the value of the first passed URL parameter called `<name>`.
+まずはじめに、監視対象毎に設定されたラベルを除いて、対応するscrapeの設定の`job_name`の値に`job`ラベルがセットされる。
+`__address__`ラベルが監視対象のアドレス`<host>:<port>`にセットされる。リラベルの後で、`instance`ラベルがセットされていなければ、デフォルトで`__address__`の値にセットされる。`__scheme__`ラベルと`__metrics_path__`ラベルはそれぞれ、監視対象のスキームとメトリクスのパスにセットされる。`__param_<name>`ラベルは、`<name>`という名前で渡された最初のURLパラメーターの値にセットされる。
 
-Additional labels prefixed with `__meta_` may be available during the
-relabeling phase. They are set by the service discovery mechanism that provided
-the target and vary between mechanisms.
+リラベルの過程で、`__meta_`でプリフィックスされたラベルが利用可能な場合がある。そういうラベルは、その監視対象を提供しているサービスディスカバリーの仕組みによってセットされる。それらのラベルはサービスディスカバリーの仕組みによって異なる。
 
-Labels starting with `__` will be removed from the label set after target
-relabeling is completed.
+`__`で始まるラベルは、リラベル完了後にラベル集合から取り除かれる。
 
-If a relabeling step needs to store a label value only temporarily (as the
-input to a subsequent relabeling step), use the `__tmp` label name prefix. This
-prefix is guaranteed to never be used by Prometheus itself.
+もしリラベルの過程で（後続の理ラベルの入力として）一時的にラベルの値を保存する必要があるなら、`__tmp`というプリフィックスを使うこと。このプリフィックスはPrometheus自体には使われないことが保証されている。
 
 ```yaml
-# The source labels select values from existing labels. Their content is concatenated
-# using the configured separator and matched against the configured regular expression
-# for the replace, keep, and drop actions.
+# 存在しているラベルから値を選択する。それらの内容は、設定されたseparatorで連結され、置
+# 換、保存、削除のために、設定された正規表現にマッチングされる。
 [ source_labels: '[' <labelname> [, ...] ']' ]
 
 # Separator placed between concatenated source label values.
 [ separator: <string> | default = ; ]
 
-# Label to which the resulting value is written in a replace action.
-# It is mandatory for replace actions. Regex capture groups are available.
+# replaceで、結果の値を書き込むためのラベル
+# replaceする場合は、必須項目。正規表現のキャプチャされたグループ利用可能
 [ target_label: <labelname> ]
 
 # Regular expression against which the extracted value is matched.
@@ -1070,67 +1034,54 @@ prefix is guaranteed to never be used by Prometheus itself.
 # Modulus to take of the hash of the source label values.
 [ modulus: <uint64> ]
 
-# Replacement value against which a regex replace is performed if the
-# regular expression matches. Regex capture groups are available.
+# 置換する値。正規表現がマッチした場合、この値で正規表現置換される。
+# 正規表現でキャプチャされたグループが利用可能
 [ replacement: <string> | default = $1 ]
 
 # Action to perform based on regex matching.
 [ action: <relabel_action> | default = replace ]
 ```
 
-`<regex>` is any valid
-[RE2 regular expression](https://github.com/google/re2/wiki/Syntax). It is
-required for the `replace`, `keep`, `drop`, `labelmap`,`labeldrop` and `labelkeep` actions. The regex is
-anchored on both ends. To un-anchor the regex, use `.*<regex>.*`.
+`<regex>`は、[RE2](https://github.com/google/re2/wiki/Syntax)で書かれた正しい正規表現である。
+これは、`replace`、`keep`、`drop`、`labelmap`、`labeldrop`、`labelkeep`のアクションのために必須である。
+この正規表現は、両端がアンカーされている。アンカーをなくすためには、`.*<regex>.*`を使うこと。
 
-`<relabel_action>` determines the relabeling action to take:
+`<relabel_action>`は、リラベルのアクションを決める。
 
-* `replace`: Match `regex` against the concatenated `source_labels`. Then, set
-  `target_label` to `replacement`, with match group references
-  (`${1}`, `${2}`, ...) in `replacement` substituted by their value. If `regex`
-  does not match, no replacement takes place.
-* `keep`: Drop targets for which `regex` does not match the concatenated `source_labels`.
-* `drop`: Drop targets for which `regex` matches the concatenated `source_labels`.
-* `hashmod`: Set `target_label` to the `modulus` of a hash of the concatenated `source_labels`.
-* `labelmap`: Match `regex` against all label names. Then copy the values of the matching labels
-   to label names given by `replacement` with match group references
-  (`${1}`, `${2}`, ...) in `replacement` substituted by their value.
-* `labeldrop`: Match `regex` against all label names. Any label that matches will be
-  removed from the set of labels.
-* `labelkeep`: Match `regex` against all label names. Any label that does not match will be
-  removed from the set of labels.
+* `replace`: 連結された`source_labels`に対して`regex`をマッチをし、`target_label`の値を`replacement`にセットする。`replacement`のグループ参照（`${1}`、`${2}`など）はそれらの値で置換される。
+* `keep`: 連結された`source_labels`に`regex`がマッチしないターゲットをdropする
+* `drop`: 連結された`source_labels`に`regex`がマッチするターゲットを削除する
+* `hashmod`: `target_label`の値を、連結された`source_labels`のハッシュを`modulus`でmodした値にセットする
+* `labelmap`: 全てのラベル名に対して`regex`をマッチをし、マッチしたラベルの値を`replacement`で指定されたラベルにコピーする。`replacement`のグループ参照（`${1}`、`${2}`など）はそれらの値で置換される。
+* `labeldrop`: 全てのラベル名に対して`regex`をマッチをし、マッチしたラベルはラベル集合から削除される
+* `labelkeep`: 全てのラベル名に対して`regex`をマッチをし、マッチしなかったラベルはラベル集合から削除される
 
-Care must be taken with `labeldrop` and `labelkeep` to ensure that metrics are still uniquely labeled
-once the labels are removed.
+`labeldrop`と`labelkeep`を使うときには、ラベルが削除されてもメトリクスが確実にユニークにラベルされているように注意する必要がある
 
 ### `<metric_relabel_configs>`
 
-Metric relabeling is applied to samples as the last step before ingestion. It
-has the same configuration format and actions as target relabeling. Metric
-relabeling does not apply to automatically generated timeseries such as `up`.
+メトリックのリラベルは、取り込まれる前の最後のステップとしてサンプルに適用される。
+ターゲットのリラベルと同じ設定フォーマットとアクションを持つ。
+メトリックのリラベルは、`up`などの生成された時系列には自動的には適用されない。
 
-One use for this is to blacklist time series that are too expensive to ingest.
+この機能の使い道の1つは、取り込むコストが高い時系列のブラックリストで弾くことである。
 
 ### `<alert_relabel_configs>`
 
-Alert relabeling is applied to alerts before they are sent to the Alertmanager.
-It has the same configuration format and actions as target relabeling. Alert
-relabeling is applied after external labels.
+アラートのリラベルは、アラートがAlertmanagerに送信される前に適用される。
+ターゲットのリラベルと同じ設定フォーマットとアクションを持つ。
+アラートのリラベルは、外部ラベルのあとで適用される。
 
-One use for this is ensuring a HA pair of Prometheus servers with different
-external labels send identical alerts.
+この機能の使い道の1つは、異なる外部ラベルを持つHAペアのPrometheusサーバーが全く同じアラートを送ることを確実にすることである。
 
 ### `<alertmanager_config>`
 
-An `alertmanager_config` section specifies Alertmanager instances the Prometheus server sends
-alerts to. It also provides parameters to configure how to communicate with these Alertmanagers.
+`alertmanager_config`は、Prometheusサーバーがアラートを送るAlertmanagerのインスタンスを指定する。
+Alertmanagerとどのように通信するかを設定するパラメーターも提供する。
 
-Alertmanagers may be statically configured via the `static_configs` parameter or
-dynamically discovered using one of the supported service-discovery mechanisms.
+Alertmanagerは、`static_configs`によって静的に設定することも、サポートされているサービスディスカバリーで動的に検出することもできる。
 
-Additionally, `relabel_configs` allow selecting Alertmanagers from discovered
-entities and provide advanced modifications to the used API path, which is exposed
-through the `__alerts_path__` label.
+`relabel_configs`によって、検出された中からAlertmanagerを選択したり、`__alerts_path__`ラベルで出力されるAPIのパスに対して高度な変更をすることができる。
 
 ```yaml
 # Per-target Alertmanager timeout when pushing alerts.
@@ -1142,20 +1093,19 @@ through the `__alerts_path__` label.
 # Configures the protocol scheme used for requests.
 [ scheme: <scheme> | default = http ]
 
-# Sets the `Authorization` header on every request with the
-# configured username and password.
-# password and password_file are mutually exclusive.
+# 設定されたusernameとpasswordでscrapeのリクエストの`Authorization`ヘッダを毎回セットする。
+# passwordとpassword_fileは相互排他的である。
 basic_auth:
   [ username: <string> ]
   [ password: <string> ]
   [ password_file: <string> ]
 
-# Sets the `Authorization` header on every request with
-# the configured bearer token. It is mutually exclusive with `bearer_token_file`.
+# 設定された署名なしトークン (Bearer Token)でリクエストの`Authorization`ヘッダを
+# 毎回セットする。`bearer_token_file`と相互排他的である。
 [ bearer_token: <string> ]
 
-# Sets the `Authorization` header on every request with the bearer token
-# read from the configured file. It is mutually exclusive with `bearer_token`.
+# 設定ファイルから読み込んだ署名なしトークン (Bearer Token)でリクエストの
+# `Authorization`ヘッダを毎回セットする。`bearer_token`と相互排他的である。
 [ bearer_token_file: /path/to/bearer/token/file ]
 
 # Configures the scrape request's TLS settings.
@@ -1220,38 +1170,36 @@ relabel_configs:
 
 ### `<remote_write>`
 
-`write_relabel_configs` is relabeling applied to samples before sending them
-to the remote endpoint. Write relabeling is applied after external labels. This
-could be used to limit which samples are sent.
+`write_relabel_configs`は、リモートエンドポイントに送信される前にサンプルに適用されるリラベルである。
+writeリラベルは、外部のラベルの後に適用される。
+これは、どのサンプルが送信されるかを制限するために利用できるだろう。
 
-There is a [small demo](/documentation/examples/remote_storage) of how to use
-this functionality.
+この機能をどのように使うかの[デモ](/documentation/examples/remote_storage)がある。
 
 ```yaml
-# The URL of the endpoint to send samples to.
+# サンプルを送信する先のエンドポイントURL
 url: <string>
 
-# Timeout for requests to the remote write endpoint.
+# remote writeエンドポイントへのリクエストのタイムアウト
 [ remote_timeout: <duration> | default = 30s ]
 
-# List of remote write relabel configurations.
+# remote writeのリラベル設定のリスト
 write_relabel_configs:
   [ - <relabel_config> ... ]
 
-# Sets the `Authorization` header on every remote write request with the
-# configured username and password.
-# password and password_file are mutually exclusive.
+# 設定されたusernameとpasswordでremote writeのリクエストの`Authorization`ヘッダを毎回セットする。
+# passwordとpassword_fileは相互排他的である。
 basic_auth:
   [ username: <string> ]
   [ password: <string> ]
   [ password_file: <string> ]
 
-# Sets the `Authorization` header on every remote write request with
-# the configured bearer token. It is mutually exclusive with `bearer_token_file`.
+# 設定された署名なしトークン (Bearer Token)でremote writeのリクエストの`Authorization`ヘッダを
+# 毎回セットする。`bearer_token_file`と相互排他的である。
 [ bearer_token: <string> ]
 
-# Sets the `Authorization` header on every remote write request with the bearer token
-# read from the configured file. It is mutually exclusive with `bearer_token`.
+# 設定ファイルから読み込んだ署名なしトークン (Bearer Token)でremote writeのリクエストの
+# `Authorization`ヘッダを毎回セットする。`bearer_token`と相互排他的である。
 [ bearer_token_file: /path/to/bearer/token/file ]
 
 # Configures the remote write request's TLS settings.
@@ -1282,9 +1230,7 @@ queue_config:
 
 ```
 
-There is a list of
-[integrations](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage)
-with this feature.
+この機能との[連携のリスト](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage)がある。
 
 ### `<remote_read>`
 
@@ -1292,32 +1238,30 @@ with this feature.
 # The URL of the endpoint to query from.
 url: <string>
 
-# An optional list of equality matchers which have to be
-# present in a selector to query the remote read endpoint.
+# remote readエンドポイントにクエリするためのセレクター
+# に含まれていなければいけない等値マッチャーのリスト（オプショナル）
 required_matchers:
   [ <labelname>: <labelvalue> ... ]
 
-# Timeout for requests to the remote read endpoint.
+# remote readエンドポイントへのリクエストのタイムアウト
 [ remote_timeout: <duration> | default = 1m ]
 
-# Whether reads should be made for queries for time ranges that
-# the local storage should have complete data for.
+# ローカルストレージが完全なデータを持っているはずの時間の範囲に対して読み込みをするべきか
 [ read_recent: <boolean> | default = false ]
 
-# Sets the `Authorization` header on every remote read request with the
-# configured username and password.
-# password and password_file are mutually exclusive.
+# 設定されたusernameとpasswordでremote readのリクエストの`Authorization`ヘッダを毎回セットする。
+# passwordとpassword_fileは相互排他的である。
 basic_auth:
   [ username: <string> ]
   [ password: <string> ]
   [ password_file: <string> ]
 
-# Sets the `Authorization` header on every remote read request with
-# the configured bearer token. It is mutually exclusive with `bearer_token_file`.
+# 設定された署名なしトークン (Bearer Token)でremote readのリクエストの`Authorization`ヘッダを
+# 毎回セットする。`bearer_token_file`と相互排他的である。
 [ bearer_token: <string> ]
 
-# Sets the `Authorization` header on every remote read request with the bearer token
-# read from the configured file. It is mutually exclusive with `bearer_token`.
+# 設定ファイルから読み込んだ署名なしトークン (Bearer Token)でremote readのリクエストの
+# `Authorization`ヘッダを毎回セットする。`bearer_token`と相互排他的である。
 [ bearer_token_file: /path/to/bearer/token/file ]
 
 # Configures the remote read request's TLS settings.
@@ -1328,6 +1272,4 @@ tls_config:
 [ proxy_url: <string> ]
 ```
 
-There is a list of
-[integrations](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage)
-with this feature.
+この機能との[連携のリスト](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage)がある。

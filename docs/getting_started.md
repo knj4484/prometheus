@@ -1,37 +1,31 @@
 ---
-title: Getting started
+title: 始め方
 sort_rank: 1
 ---
 
-# Getting started
+# 始め方
 
-This guide is a "Hello World"-style tutorial which shows how to install,
-configure, and use Prometheus in a simple example setup. You will download and run
-Prometheus locally, configure it to scrape itself and an example application,
-and then work with queries, rules, and graphs to make use of the collected time
-series data.
+このガイドは、Hello World形式のチュートリアルである。
+簡単なサンプルのセットアップを通して、Prometheusをインストールし、設定し、利用する方法を示す。
+ローカルで、Prometheusをダウンロードし、実行し、自分自身とサンプルアプリケーションをscrapeするように設定することになる。
+そして、収集した時系列を利用するためのクエリ、ルール、グラフに取り組むことになる。
 
-## Downloading and running Prometheus
+## Prometheusのダウンロードと実行
 
-[Download the latest release](https://prometheus.io/download) of Prometheus for
-your platform, then extract and run it:
-
+自分のプラットフォームに合った[Prometheusの最新リリース](https://prometheus.io/download)をダウンロードし、展開、実行する
 ```bash
 tar xvfz prometheus-*.tar.gz
 cd prometheus-*
 ```
 
-Before starting Prometheus, let's configure it.
+Prometheusを起動する前に、設定をしよう。
 
-## Configuring Prometheus to monitor itself
+## 自分自身を監視するPrometheusの設定
 
-Prometheus collects metrics from monitored targets by scraping metrics HTTP
-endpoints on these targets. Since Prometheus also exposes data in the same
-manner about itself, it can also scrape and monitor its own health.
+Prometheusは、監視対象のHTTPのエンドポイントをスクレイプすることで監視対象からメトリクスを収集する。 Prometheusはまた自分自身に関して同じ方法でデータをexposeしているので、自分自身の状態をスクレイプし、監視することができる。
 
-While a Prometheus server that collects only data about itself is not very
-useful in practice, it is a good starting example. Save the following basic
-Prometheus configuration as a file named `prometheus.yml`:
+自分自身のデータしか収集しないPrometheusサーバーは、実際は特に有益ではないが、最初の例としては良い。
+以下のPrometheusの基本的な設定を`prometheus.yml`という名前のファイルに保存する。
 
 ```yaml
 global:
@@ -55,13 +49,13 @@ scrape_configs:
       - targets: ['localhost:9090']
 ```
 
-For a complete specification of configuration options, see the
-[configuration documentation](configuration/configuration.md).
+*訳注: external_labelsには、ある組織内のPrometheusはそれぞれユニークな値を付けるべきである。*
 
-## Starting Prometheus
+設定項目の全ての仕様については、[設定のドキュメント](configuration/configuration.md)を参照すること。
 
-To start Prometheus with your newly created configuration file, change to the
-directory containing the Prometheus binary and run:
+## Prometheusの起動
+
+新しく作成した設定ファイルでPrometheusを起動するには、Prometheusのバイナリがあるディレクトリに移動して、以下のコマンドを実行する
 
 ```bash
 # Start Prometheus.
@@ -69,79 +63,58 @@ directory containing the Prometheus binary and run:
 ./prometheus --config.file=prometheus.yml
 ```
 
-Prometheus should start up. You should also be able to browse to a status page
-about itself at [localhost:9090](http://localhost:9090). Give it a couple of
-seconds to collect data about itself from its own HTTP metrics endpoint.
+Prometheusが起動し、[localhost:9090](http://localhost:9090)でPrometheus自体のステータスページを見ることができるはずである。
+Prometheusが自分自身のデータをメトリクスのHTTPエンドポイントから収集するためにしばらく時間を与える。
 
-You can also verify that Prometheus is serving metrics about itself by
-navigating to its metrics endpoint:
-[localhost:9090/metrics](http://localhost:9090/metrics)
+また、メトリクスのエンドポイント[localhost:9090/metrics](http://localhost:9090/metrics)に行くことで、Prometheusが自分自身のメトリクスを提供していることを確認できる。
 
-## Using the expression browser
+## expressionブラウザの利用
 
-Let us try looking at some data that Prometheus has collected about itself. To
-use Prometheus's built-in expression browser, navigate to
-http://localhost:9090/graph and choose the "Console" view within the "Graph"
-tab.
+Prometheusが自分自身について収集したデータをいくつか見てみることにしよう。 Prometheusに組み込まれたexpressionブラウザを使うには、 http://localhost:9090/graph に行って、Consoleビューを選択する。
 
-As you can gather from [localhost:9090/metrics](http://localhost:9090/metrics),
-one metric that Prometheus exports about itself is called
-`prometheus_target_interval_length_seconds` (the actual amount of time between
-target scrapes). Go ahead and enter this into the expression console:
+[localhost:9090/metrics](http://localhost:9090/metrics)から収集出来る通り、Prometheusが自分自身について出力しているメトリクスの一つに`prometheus_target_interval_length_seconds`（対象のscrape間の実際の時間）がある。 expressionコンソールに下記を入力する。
 
 ```
 prometheus_target_interval_length_seconds
 ```
 
-This should return a number of different time series (along with the latest value
-recorded for each), all with the metric name
-`prometheus_target_interval_length_seconds`, but with different labels. These
-labels designate different latency percentiles and target group intervals.
+これは、全て`prometheus_target_interval_length_seconds`という名前でラベルの異なるたくさんの時系列を（それぞれに対する最新の記録された値とともに）返すはずである。 これらのラベルは、異なるレイテンシーのパーセンタイルと監視対象グループのintervalを示している。
 
-If we were only interested in the 99th percentile latencies, we could use this
-query to retrieve that information:
+99パーセンタイルのレイテンシーのみに興味があるとすると、その情報を取得するために以下のクエリを使うこともできる。
 
 ```
 prometheus_target_interval_length_seconds{quantile="0.99"}
 ```
 
-To count the number of returned time series, you could write:
+返された時系列の数をカウントするには、以下のように書くことができる。
 
 ```
 count(prometheus_target_interval_length_seconds)
 ```
 
-For more about the expression language, see the
-[expression language documentation](querying/basics.md).
+クエリ言語のさらなる情報については、[クエリ言語のドキュメント](querying/basics.md)を参照すること。
 
-## Using the graphing interface
+## グラフ化インターフェースの利用
 
-To graph expressions, navigate to http://localhost:9090/graph and use the "Graph"
-tab.
+expressionをグラフ化するには、 http://localhost:9090/graph に行ってGraphタブを利用する
 
-For example, enter the following expression to graph the per-second rate of chunks 
-being created in the self-scraped Prometheus:
+例えば、自分自身がscrapeされているPrometheusに作成されているチャンクの秒間レートをグラフ化する以下の式を入力する
 
 ```
 rate(prometheus_tsdb_head_chunks_created_total[1m])
 ```
 
-Experiment with the graph range parameters and other settings.
+グラフの幅のパラメーターや他の設定を試してみること。
 
-## Starting up some sample targets
+## サンプル監視対象の起動
 
-Let us make this more interesting and start some example targets for Prometheus
-to scrape.
+これをもっと面白くし、Prometheusがscrapeするサンプルの監視対象を起動してみよう。
 
-The Go client library includes an example which exports fictional RPC latencies
-for three services with different latency distributions.
+Goクライアントライブラリには、異なる分布を持つ架空のRPCレイテンシーを出力する例が含まれている。
 
-Ensure you have the [Go compiler installed](https://golang.org/doc/install) and
-have a [working Go build environment](https://golang.org/doc/code.html) (with
-correct `GOPATH`) set up.
+[Goコンパイラがインストールされている](https://golang.org/doc/install)ことと[Goのビルド環境](https://golang.org/doc/code.html)が（正しい`GOPATH`で）セットアップされていることを確認する。
 
-Download the Go client library for Prometheus and run three of these example
-processes:
+PrometheusのGoクライアントライブラリをダウンロードし、3つのサンプルプロセスを実行する
 
 ```bash
 # Fetch the client library code and compile example.
@@ -156,21 +129,17 @@ go build
 ./random -listen-address=:8082
 ```
 
-You should now have example targets listening on http://localhost:8080/metrics,
-http://localhost:8081/metrics, and http://localhost:8082/metrics.
+これで、 http://localhost:8080/metrics 、 http://localhost:8081/metrics 、 http://localhost:8082/metrics をリッスンしているサンプルターゲットが出来た。
 
-## Configuring Prometheus to monitor the sample targets
+## サンプルターゲットを監視するためのPrometheusの設定
 
-Now we will configure Prometheus to scrape these new targets. Let's group all
-three endpoints into one job called `example-random`. However, imagine that the
-first two endpoints are production targets, while the third one represents a
-canary instance. To model this in Prometheus, we can add several groups of
-endpoints to a single job, adding extra labels to each group of targets. In
-this example, we will add the `group="production"` label to the first group of
-targets, while adding `group="canary"` to the second.
+ここで、新しい監視対象をscrapeするようにPrometheusを設定する。
+3つのエンドポイントを`example-random`という1つのジョブにまとめよう。
+ただし、最初の2つは本番の監視対象、3つ目はカナリヤだと仮定する。
+これをPrometheusで表すために。複数のエンドポイントのグループを1つのジョブに追加し、各グループにラベルを追加することができる。
+この例では、ラベル`group="production"`を1つ目のグループに追加し、2つ目には`group="canary"`を追加する。
 
-To achieve this, add the following job definition to the `scrape_configs`
-section in your `prometheus.yml` and restart your Prometheus instance:
+これを実現するために、以下のジョブの定義を`prometheus.yml`の`scrape_configs`に追加し、Prometheusを再起動する。
 
 ```yaml
 scrape_configs:
@@ -189,30 +158,22 @@ scrape_configs:
           group: 'canary'
 ```
 
-Go to the expression browser and verify that Prometheus now has information
-about time series that these example endpoints expose, such as the
-`rpc_durations_seconds` metric.
+expressionブラウザを開いて、これらのサンプルのエンドポイントが出力している時系列（`rpc_durations_seconds`など）の情報をPrometheusが持っていることを確認する。
 
-## Configure rules for aggregating scraped data into new time series
+## スクレイプしたデータを新しい時系列に集約するルールの設定
 
-Though not a problem in our example, queries that aggregate over thousands of
-time series can get slow when computed ad-hoc. To make this more efficient,
-Prometheus allows you to prerecord expressions into completely new persisted
-time series via configured recording rules. Let's say we are interested in
-recording the per-second rate of example RPCs
-(`rpc_durations_seconds_count`) averaged over all instances (but
-preserving the `job` and `service` dimensions) as measured over a window of 5
-minutes. We could write this as:
+この例では問題ないが、数千の時系列を集約するクエリは、アドホックに計算すると遅くなることがある。
+これをもっと効率的にするために、Prometheusでは、設定されたレコーディングルールを通して、全く新しい永続的な時系列を事前に記録しておくことができる。
+例えば、`job`と`service`の軸は残しつつ、5分の窓で全てのインスタンスについての平均にされたサンプルRPCの秒間レート（`rpc_durations_seconds_count`）を記録したいとする。
+これは次のように書くことができる。
 
 ```
 avg(rate(rpc_durations_seconds_count[5m])) by (job, service)
 ```
 
-Try graphing this expression.
+この式をグラフ化してみること。
 
-To record the time series resulting from this expression into a new metric
-called `job_service:rpc_durations_seconds_count:avg_rate5m`, create a file
-with the following recording rule and save it as `prometheus.rules.yml`:
+この式の結果となる時系列を`job_service:rpc_durations_seconds_count:avg_rate5m`というメトリックとして記録するために、以下のレコーディングルールでファイルを作成し、`prometheus.rules.yml`として保存する。
 
 ```
 groups:
@@ -222,8 +183,8 @@ groups:
     expr: avg(rate(rpc_durations_seconds_count[5m])) by (job, service)
 ```
 
-To make Prometheus pick up this new rule, add a `rule_files` statement in your `prometheus.yml`. The config should now
-look like this:
+このルールをPrometheusが見つけられるように、`rule_files`を`prometheus.yml`に追加する。
+これで設定は以下のようになるはずである。
 
 ```yaml
 global:
@@ -261,6 +222,4 @@ scrape_configs:
           group: 'canary'
 ```
 
-Restart Prometheus with the new configuration and verify that a new time series
-with the metric name `job_service:rpc_durations_seconds_count:avg_rate5m`
-is now available by querying it through the expression browser or graphing it.
+新しい設定でPrometheusを再起動して、`job_service:rpc_durations_seconds_count:avg_rate5m`という名前の新しいメトリックが利用可能であることをexpressionブラウザやグラフ化することで確認しよう。

@@ -5,87 +5,73 @@ sort_rank: 7
 
 # HTTP API
 
-The current stable HTTP API is reachable under `/api/v1` on a Prometheus
-server. Any non-breaking additions will be added under that endpoint.
+現状の安定版HTTP APIは、Prometheusサーバーの`/api/v1`でアクセスできる。 非破壊的な追加がこのエンドポイントに追加されることがある。
 
-## Format overview
+## フォーマット概要
 
-The API response format is JSON. Every successful API request returns a `2xx`
-status code.
+成功したAPIリクエストはステータスコード`2xx`を返す。
 
-Invalid requests that reach the API handlers return a JSON error object
-and one of the following HTTP response codes:
+APIハンドラに届いた不正なリクエストは、JSONエラーオブジェクトと以下のHTTPレスポンスコードの1つを返す。
 
-- `400 Bad Request` when parameters are missing or incorrect.
-- `422 Unprocessable Entity` when an expression can't be executed
-  ([RFC4918](https://tools.ietf.org/html/rfc4918#page-78)).
-- `503 Service Unavailable` when queries time out or abort.
+- `400 Bad Request` パラメーターが欠けていたり間違っている場合
+- `422 Unprocessable Entity` 式が実行できない場合([RFC4918](https://tools.ietf.org/html/rfc4918#page-78))
+- `503 Service Unavailable` クエリがタイムアウトしたりアボートした場合
 
-Other non-`2xx` codes may be returned for errors occurring before the API
-endpoint is reached.
+APIエンドポイントに到達する前に起きたエラーに対しては、`2xx`でない他のコードが返される場合もある。
 
-An array of warnings may be returned if there are errors that do
-not inhibit the request execution. All of the data that was successfully
-collected will be returned in the data field.
+リクエストの実行を妨げなかったエラーがあると、警告の配列が返される場合もある。
+収集に成功した全てのデータは、データフィールド入れて返される。
 
-The JSON response envelope format is as follows:
+JSONレスポンスのフォーマットは以下の通りである。
 
 ```
 {
   "status": "success" | "error",
   "data": <data>,
 
-  // Only set if status is "error". The data field may still hold
-  // additional data.
+  // statusがerrorの場合のみセットされる。
+  // その場合でも、dataフィールドは追加のデータを保持している場合がある。
   "errorType": "<string>",
   "error": "<string>",
 
-  // Only if there were warnings while executing the request.
-  // There will still be data in the data field.
+  // リクエスト実行中に警告があった場合のみセットされる。
+  // その場合でも、dataフィールドは追加のデータを保持している場合がある。
   "warnings": ["<string>"]
 }
 ```
 
-Input timestamps may be provided either in
-[RFC3339](https://www.ietf.org/rfc/rfc3339.txt) format or as a Unix timestamp
-in seconds, with optional decimal places for sub-second precision. Output
-timestamps are always represented as Unix timestamps in seconds.
+入力のタイムスタンプは、[RFC3339](https://www.ietf.org/rfc/rfc3339.txt)のフォーマットまたは秒で表したUnixタイムスタンプ（オプションで秒未満の精度のために少数をつける）として与えることができる。 出力のタイムスタンプは、常に、秒で表されたUnixタイムスタンプである。
 
-Names of query parameters that may be repeated end with `[]`.
+繰り返される可能性があるクエリパラメーターの名前は[]で終わる。
 
-`<series_selector>` placeholders refer to Prometheus [time series
-selectors](basics.md#time-series-selectors) like `http_requests_total` or
-`http_requests_total{method=~"(GET|POST)"}` and need to be URL-encoded.
+プレースホルダー`<series_selector>`は、`http_requests_total`や`http_requests_total{method=~"(GET|POST)"}`のような時系列セレクターを表し、URLエンコードされてなければいけない。
 
-`<duration>` placeholders refer to Prometheus duration strings of the form
-`[0-9]+[smhdwy]`. For example, `5m` refers to a duration of 5 minutes.
+プレースホルダー`<duration>`は、`[0-9]+[smhdwy]`という形式の時間幅の文字列を表す。 例えば、`5m`は5分の時間幅を表す。
 
-`<bool>` placeholders refer to boolean values (strings `true` and `false`).
+プレースホルダー`<bool>`は、ブール値（文字列で`true`と`false`）を表す。
 
-## Expression queries
+## 式のクエリ
 
-Query language expressions may be evaluated at a single instant or over a range
-of time. The sections below describe the API endpoints for each type of
-expression query.
+クエリ言語の式は、時間のある一点で評価されるかもしれないし、時間幅に渡って評価されるかもしれない。
+以下のセクションでは、それぞれのタイプのクエリのためのAPIエンドポイントについて説明する。
 
 ### Instant queries
 
-The following endpoint evaluates an instant query at a single point in time:
+以下のエンドポイントは、時間の一点でのinstantクエリを評価する。
 
 ```
 GET /api/v1/query
 ```
 
-URL query parameters:
+URLクエリパラメーターは以下の通り。
 
-- `query=<string>`: Prometheus expression query string.
-- `time=<rfc3339 | unix_timestamp>`: Evaluation timestamp. Optional.
-- `timeout=<duration>`: Evaluation timeout. Optional. Defaults to and
-   is capped by the value of the `-query.timeout` flag.
+- `query=<string>`: Prometheusのexpressionのクエリの文字列
+- `time=<rfc3339 | unix_timestamp>`: 評価時間（オプション）
+- `timeout=<duration>`: 評価のタイムアウト（オプション）。`-query.timeout`フラグの値がデフォルトであり、かつ上限となる。
 
-The current server time is used if the `time` parameter is omitted.
+`time`パラメーターが省略されると、現在のサーバー時間が利用される。
 
-The `data` section of the query result has the following format:
+結果の`data`セクションは以下のフォーマットである。
 
 ```
 {
@@ -94,12 +80,9 @@ The `data` section of the query result has the following format:
 }
 ```
 
-`<value>` refers to the query result data, which has varying formats
-depending on the `resultType`. See the [expression query result
-formats](#expression-query-result-formats).
+`<value>`は、クエリの結果のデータを表しており、`resultType`に応じて、様々なフォーマットになる。 後述の[結果のフォーマット](#expression-query-result-formats)を参照すること。
 
-The following example evaluates the expression `up` at the time
-`2015-07-01T20:10:51.781Z`:
+以下の例は、式upを`2015-07-01T20:10:51.781Z`の時点で評価している。
 
 ```json
 $ curl 'http://localhost:9090/api/v1/query?query=up&time=2015-07-01T20:10:51.781Z'
@@ -131,22 +114,21 @@ $ curl 'http://localhost:9090/api/v1/query?query=up&time=2015-07-01T20:10:51.781
 
 ### Range queries
 
-The following endpoint evaluates an expression query over a range of time:
+以下のエンドポイントは、ある時間幅に渡ってクエリの式を評価する。
 
 ```
 GET /api/v1/query_range
 ```
 
-URL query parameters:
+URLクエリパラメーターは以下の通り。
 
-- `query=<string>`: Prometheus expression query string.
-- `start=<rfc3339 | unix_timestamp>`: Start timestamp.
-- `end=<rfc3339 | unix_timestamp>`: End timestamp.
-- `step=<duration | float>`: Query resolution step width in `duration` format or float number of seconds.
-- `timeout=<duration>`: Evaluation timeout. Optional. Defaults to and
-   is capped by the value of the `-query.timeout` flag.
+- `query=<string>`: Prometheusのexpressionのクエリの文字列
+- `start=<rfc3339 | unix_timestamp>`: 開始時刻のタイムスタンプ
+- `end=<rfc3339 | unix_timestamp>`: 終了時刻のタイムスタンプ
+- `step=<duration | float>`: クエリ解像度のステップ幅（`duration`フォーマットまたは秒数の少数）
+- `timeout=<duration>`: 評価のタイムアウト（オプション）。`-query.timeout`フラグの値がデフォルトであり、かつ上限となる。
 
-The `data` section of the query result has the following format:
+結果の`data`セクションは以下のフォーマットである。
 
 ```
 {
@@ -155,11 +137,9 @@ The `data` section of the query result has the following format:
 }
 ```
 
-For the format of the `<value>` placeholder, see the [range-vector result
-format](#range-vectors).
+プレイスホルダー`<value>`のフォーマットについては、[range-vector結果フォーマット](#range-vectors)を参照すること。
 
-The following example evaluates the expression `up` over a 30-second range with
-a query resolution of 15 seconds.
+以下の例は、式upを30秒の時間幅にかけて15秒の解像度で評価している。
 
 ```json
 $ curl 'http://localhost:9090/api/v1/query_range?query=up&start=2015-07-01T20:10:30.781Z&end=2015-07-01T20:11:00.781Z&step=15s'
@@ -197,28 +177,25 @@ $ curl 'http://localhost:9090/api/v1/query_range?query=up&start=2015-07-01T20:10
 }
 ```
 
-## Querying metadata
+## メタデータのクエリ
 
-### Finding series by label matchers
+### ラベルマッチャーによる時系列の検索
 
-The following endpoint returns the list of time series that match a certain label set.
+以下のエンドポイントはラベル集合にマッチする時系列のリストを返す。
 
 ```
 GET /api/v1/series
 ```
 
-URL query parameters:
+URLクエリパラメーターは以下の通り。
 
-- `match[]=<series_selector>`: Repeated series selector argument that selects the
-  series to return. At least one `match[]` argument must be provided.
-- `start=<rfc3339 | unix_timestamp>`: Start timestamp.
-- `end=<rfc3339 | unix_timestamp>`: End timestamp.
+- `atch[]=<series_selector>`: 時系列を選択するためのセレクター引数。少なくとも1つのmatch[]を指定する必要がある
+- `start=<rfc3339 | unix_timestamp>`: 開始時刻のタイムスタンプ
+- `end=<rfc3339 | unix_timestamp>`: 終了時刻のタイムスタンプ
 
-The `data` section of the query result consists of a list of objects that
-contain the label name/value pairs which identify each series.
+結果のdataセクションは、各時系列を特定するラベル名/値を含むオブジェクトのリストである。
 
-The following example returns all series that match either of the selectors
-`up` or `process_start_time_seconds{job="prometheus"}`:
+以下の例は、セレクター`up`または`process_start_time_seconds{job="prometheus"}`にマッチする全ての時系列を返す。
 
 ```json
 $ curl -g 'http://localhost:9090/api/v1/series?match[]=up&match[]=process_start_time_seconds{job="prometheus"}'
@@ -244,18 +221,18 @@ $ curl -g 'http://localhost:9090/api/v1/series?match[]=up&match[]=process_start_
 }
 ```
 
-### Getting label names
+### ラベル名の取得
 
-The following endpoint returns a list of label names:
+以下のエンドポイントはラベル名のリストを返す。
 
 ```
 GET /api/v1/labels
 POST /api/v1/labels
 ```
 
-The `data` section of the JSON response is a list of string label names.
+JSONレスポンスの`data`セクションは、ラベル名の文字列のリストである。
 
-Here is an example.
+以下に例を示す。
 
 ```json
 $ curl 'localhost:9090/api/v1/labels'
@@ -287,17 +264,17 @@ $ curl 'localhost:9090/api/v1/labels'
 }
 ```
 
-### Querying label values
+### ラベル値のクエリ
 
-The following endpoint returns a list of label values for a provided label name:
+以下のエンドポイントは、与えられたラベル名に対するラベル値のリストを返す。
 
 ```
 GET /api/v1/label/<label_name>/values
 ```
 
-The `data` section of the JSON response is a list of string label values.
+JSONレスポンスの`data`セクションは、ラベル値の文字列のリストである。
 
-This example queries for all label values for the `job` label:
+この例は、ラベル`job`に対する全てのラベル値を取得している。
 
 ```json
 $ curl http://localhost:9090/api/v1/label/job/values
@@ -310,18 +287,13 @@ $ curl http://localhost:9090/api/v1/label/job/values
 }
 ```
 
-## Expression query result formats
+## 式のクエリの結果フォーマット
 
-Expression queries may return the following response values in the `result`
-property of the `data` section. `<sample_value>` placeholders are numeric
-sample values. JSON does not support special float values such as `NaN`, `Inf`,
-and `-Inf`, so sample values are transferred as quoted JSON strings rather than
-raw numbers.
+式のクエリは、`data`セクションのresultプロパティに以下のレスポンスを入れて返す。 プレースホルダー`<sample_value>`は、数値のサンプル値である。 `JSON`は、`NaN`や`Inf`、`-Inf`といった特別な値をサポートしないので、生の数値の代わりに、クオートされたJSON文字列として送信される。
 
 ### Range vectors
 
-Range vectors are returned as result type `matrix`. The corresponding
-`result` property has the following format:
+Range vectorは、結果タイプ`matrix`として返される。 対応する`result`プロパティは、以下のフォーマットとなる。
 
 ```
 [
@@ -335,8 +307,7 @@ Range vectors are returned as result type `matrix`. The corresponding
 
 ### Instant vectors
 
-Instant vectors are returned as result type `vector`. The corresponding
-`result` property has the following format:
+Instant vectorは、結果タイプ`vector`として返される。 対応する`result`プロパティは、以下のフォーマットとなる。
 
 ```
 [
@@ -348,36 +319,32 @@ Instant vectors are returned as result type `vector`. The corresponding
 ]
 ```
 
-### Scalars
+### スカラー
 
-Scalar results are returned as result type `scalar`. The corresponding
-`result` property has the following format:
+スカラーは、結果タイプ`scalar`として返される。 対応する`result`プロパティは、以下のフォーマットとなる。
 
 ```
 [ <unix_time>, "<scalar_value>" ]
 ```
 
-### Strings
+### 文字列
 
-String results are returned as result type `string`. The corresponding
-`result` property has the following format:
+文字列は、結果タイプ`string`として返される。 対応する`result`プロパティは、以下のフォーマットとなる。
 
 ```
 [ <unix_time>, "<string_value>" ]
 ```
 
-## Targets
+## 監視対象
 
-The following endpoint returns an overview of the current state of the
-Prometheus target discovery:
+以下のエンドポイントは、監視対象の検出の現在の状態の概要を返す。
 
 ```
 GET /api/v1/targets
 ```
 
-Both the active and dropped targets are part of the response.
-`labels` represents the label set after relabelling has occurred.
-`discoveredLabels` represent the unmodified labels retrieved during service discovery before relabelling has occurred.
+activeなターゲットとdropされたターゲットのどちらも含まれる。 `labels`は、リラベルが起きた後のラベル集合を表す。
+`discoveredLabels`は、サービスディスカバリーで取得したリラベリングされる前の修正されていないラベルを表す。
 
 ```json
 $ curl http://localhost:9090/api/v1/targets
@@ -416,15 +383,11 @@ $ curl http://localhost:9090/api/v1/targets
 }
 ```
 
+## ルール
 
-## Rules
+APIエンドポイント`/rules`は、現在読み込まれているアラートルールとレコーディングルールのリストを返す。 Prometheusが起こした各アラートルールの現在activeなアラートも返す。
 
-The `/rules` API endpoint returns a list of alerting and recording rules that
-are currently loaded. In addition it returns the currently active alerts fired
-by the Prometheus instance of each alerting rule.
-
-As the `/rules` endpoint is fairly new, it does not have the same stability
-guarantees as the overarching API v1.
+エンドポイント`/rules`は、かなり新しいので、API v1と同じ安定性の保証はない。
 
 ```
 GET /api/v1/rules
@@ -483,12 +446,11 @@ $ curl http://localhost:9090/api/v1/rules
 ```
 
 
-## Alerts
+## アラート
 
-The `/alerts` endpoint returns a list of all active alerts.
+エンドポイント`/alerts`は、全てのactiveなアラートのリストを返す。
 
-As the `/alerts` endpoint is fairly new, it does not have the same stability
-guarantees as the overarching API v1.
+エンドポイント`/alerts`はかなり新しいので、API v1と同じ安定性の保証はない。
 
 ```
 GET /api/v1/alerts
@@ -517,24 +479,21 @@ $ curl http://localhost:9090/api/v1/alerts
 
 ## Querying target metadata
 
-The following endpoint returns metadata about metrics currently scraped by targets.
-This is **experimental** and might change in the future.
+下記のエンドポイントは、現在取得ずみのメトリクスに関するメタデータを返す。 これは、**実験的**であり、将来的には変更される可能性がある。
 
 ```
 GET /api/v1/targets/metadata
 ```
 
-URL query parameters:
+URLクエリパラメーターは以下の通り。
 
-- `match_target=<label_selectors>`: Label selectors that match targets by their label sets. All targets are selected if left empty.
-- `metric=<string>`: A metric name to retrieve metadata for. All metric metadata is retrieved if left empty.
-- `limit=<number>`: Maximum number of targets to match.
+- `match_target=<label_selectors>`: ラベル集合でターゲットとマッチングをするラベルセレクター。空にすると全てのターゲットが選択される
+- `metric=<string>`: メタデータを取得する対象のメトリック名。空にすると全てのメトリックのメタデータが選択される
+- `limit=<number>`: マッチングするターゲットの最大数
 
-The `data` section of the query result consists of a list of objects that
-contain metric metadata and the target label set.
+クエリの結果の`data`部分は、メトリックのメタデータとターゲットのラベル集合を含むオブジェクトのリストから成る。
 
-The following example returns all metadata entries for the `go_goroutines` metric
-from the first two targets with label `job="prometheus"`.
+以下の例は、最初の2つのターゲットのメトリック`go_goroutines`でラベル`job="prometheus"`を持つものに対する全てのメタデータを返す。
 
 ```json
 curl -G http://localhost:9091/api/v1/targets/metadata \
@@ -566,8 +525,7 @@ curl -G http://localhost:9091/api/v1/targets/metadata \
 }
 ```
 
-The following example returns metadata for all metrics for all targets with
-label `instance="127.0.0.1:9090`.
+以下の例は、ラベル`instance="127.0.0.1:9090"`を持つ全てのターゲットの全てのメトリックに対するメタデータを返す。
 
 ```json
 curl -G http://localhost:9091/api/v1/targets/metadata \
@@ -603,19 +561,19 @@ curl -G http://localhost:9091/api/v1/targets/metadata \
 
 ## Alertmanagers
 
-The following endpoint returns an overview of the current state of the
-Prometheus alertmanager discovery:
+以下のエンドポイントは、Alertmanager検出の現在の状況の概要を返す。
 
 ```
 GET /api/v1/alertmanagers
 ```
 
-Both the active and dropped Alertmanagers are part of the response.
+activeなAlertmanagerとdropされたAlertmanagerのどちらも結果に含まれる。
 
 ```json
 $ curl http://localhost:9090/api/v1/alertmanagers
 {
-  "status": "success",
+  "status"593
+  "success",
   "data": {
     "activeAlertmanagers": [
       {
@@ -633,18 +591,17 @@ $ curl http://localhost:9090/api/v1/alertmanagers
 
 ## Status
 
-Following status endpoints expose current Prometheus configuration.
+以下のstatusエンドポイントは、Prometheusの設定を出力する。
 
 ### Config
 
-The following endpoint returns currently loaded configuration file:
+以下のエンドポイントは、現在読み込まれている設定ファイルを返す。
 
 ```
 GET /api/v1/status/config
 ```
 
-The config is returned as dumped YAML file. Due to limitation of the YAML
-library, YAML comments are not included.
+設定は、YAMLファイルのダンプとして返される。YAMLライブラリの制限で、YAMLコメントは含まれない。
 
 ```json
 $ curl http://localhost:9090/api/v1/status/config
@@ -658,13 +615,13 @@ $ curl http://localhost:9090/api/v1/status/config
 
 ### Flags
 
-The following endpoint returns flag values that Prometheus was configured with:
+以下のエンドポイントは、Prometheusに与えられたフラグの値を返す。
 
 ```
 GET /api/v1/status/flags
 ```
 
-All values are in a form of "string".
+全ての値は文字列である。
 
 ```json
 $ curl http://localhost:9090/api/v1/status/flags
@@ -684,13 +641,13 @@ $ curl http://localhost:9090/api/v1/status/flags
 *New in v2.2*
 
 ## TSDB Admin APIs
-These are APIs that expose database functionalities for the advanced user. These APIs are not enabled unless the `--web.enable-admin-api` is set.
+これらは、上級ユーザーのためにデータベースの機能を出力するAPIである。 `--web.enable-admin-api`がセットされていなければ有効ではない。
 
-We also expose a gRPC API whose definition can be found [here](https://github.com/prometheus/prometheus/blob/master/prompb/rpc.proto). This is experimental and might change in the future.
+gRPC APIも公開しており、[ここ](https://github.com/prometheus/prometheus/blob/master/prompb/rpc.proto)に定義がある。 これは、実験的なものであり、将来的には変更される可能性がある。
 
-### Snapshot
-Snapshot creates a snapshot of all current data into `snapshots/<datetime>-<rand>` under the TSDB's data directory and returns the directory as response.
-It will optionally skip snapshotting data that is only present in the head block, and which has not yet been compacted to disk.
+### スナップショット
+スナップショットは、TSDBのデータディレクトリの下の`snapshots/<datetime>-<rand>`に全ての現在のデータのスナップショットを作成し、そのディレクトリを返す。 
+オプションで、ヘッドブロックだけにありまだディスクにコンパクト化されていないデータのスナップショットをスキップする。
 
 ```
 POST /api/v1/admin/tsdb/snapshot?skip_head=<bool>
@@ -706,28 +663,28 @@ $ curl -XPOST http://localhost:9090/api/v1/admin/tsdb/snapshot
 }
 ```
 
-The snapshot now exists at `<data-dir>/snapshots/20171210T211224Z-2be650b6d019eb54`
+このスナップショットは`<data-dir>/snapshots/20171210T211224Z-2be650b6d019eb54`にある。
 
 *New in v2.1*
 
-### Delete Series
-DeleteSeries deletes data for a selection of series in a time range. The actual data still exists on disk and is cleaned up in future compactions or can be explicitly cleaned up by hitting the Clean Tombstones endpoint.
+### 時系列の削除
+DeleteSeriesは、ある時間幅にある選択された時系列のデータを削除する。 実際のデータはディスクに存在し続けて、その後のコンパクションで片付けられるか、Clean Tombstonesエンドポイントを叩くことで片付けられる。
 
-If successful, a `204` is returned.
+成功すると`204`が返される。
 
 ```
 POST /api/v1/admin/tsdb/delete_series
 ```
 
-URL query parameters:
+URLクエリパラメーターは以下の通り。
 
-- `match[]=<series_selector>`: Repeated label matcher argument that selects the series to delete. At least one `match[]` argument must be provided.
-- `start=<rfc3339 | unix_timestamp>`: Start timestamp. Optional and defaults to minimum possible time.
-- `end=<rfc3339 | unix_timestamp>`: End timestamp. Optional and defaults to maximum possible time.
+- `match[]=<series_selector>`: 時系列を選択するためのセレクター引数。少なくとも1つのmatch[]を指定する必要がある
+- `start=<rfc3339 | unix_timestamp>`: 開始時刻のタイムスタンプ。オプションでデフォルトは可能な限り最小の時刻
+- `end=<rfc3339 | unix_timestamp>`: 終了時刻のタイムスタンプ。オプションでデフォルトは可能な限り最大の時刻
 
-Not mentioning both start and end times would clear all the data for the matched series in the database.
+開始時刻と終了時刻を指定しないと、データベース中のマッチした時系列の全てのデータが削除される。
 
-Example:
+例
 
 ```json
 $ curl -X POST \
@@ -735,16 +692,16 @@ $ curl -X POST \
 ```
 *New in v2.1*
 
-### Clean Tombstones
-CleanTombstones removes the deleted data from disk and cleans up the existing tombstones. This can be used after deleting series to free up space.
+### tombstoneの削除
+CleanTombstonesは、削除済みのデータをディスクから削除し、存在するtombstonesを一掃する。 これは、時系列を削除した後に、ディスクスペースを空けるために利用される。
 
-If successful, a `204` is returned.
+成功すると`204`が返される。
 
 ```
 POST /api/v1/admin/tsdb/clean_tombstones
 ```
 
-This takes no parameters or body.
+パラメーターやレスポンスボディはない。
 
 ```json
 $ curl -XPOST http://localhost:9090/api/v1/admin/tsdb/clean_tombstones

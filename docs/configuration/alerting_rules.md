@@ -1,22 +1,18 @@
 ---
-title: Alerting rules
+title: アラートルール
 sort_rank: 3
 ---
 
-# Alerting rules
+# アラートルール
 
-Alerting rules allow you to define alert conditions based on Prometheus
-expression language expressions and to send notifications about firing alerts
-to an external service. Whenever the alert expression results in one or more
-vector elements at a given point in time, the alert counts as active for these
-elements' label sets.
+アラートルールによって、Prometheusの式に基づいたアラート条件を定義し、外部サービスにアラートに関する通知を送信できるようになる。
+ある時点での式の結果が1つ以上のベクトル要素になれば、それらの要素のラベル集合に対してアラートがactiveであるとみなされる。
 
-### Defining alerting rules
+### アラートルールの定義
 
-Alerting rules are configured in Prometheus in the same way as [recording
-rules](recording_rules.md).
+アラートルールは、[レコーディングルール](recording_rules.md)と同じ方法で設定される。
 
-An example rules file with an alert would be:
+1つのアラートを含むルールの例は、以下のようになるだろう。
 
 ```yaml
 groups:
@@ -31,27 +27,28 @@ groups:
       summary: High request latency
 ```
 
-The optional `for` clause causes Prometheus to wait for a certain duration
-between first encountering a new expression output vector element and counting an alert as firing for this element. In this case, Prometheus will check that the alert continues to be active during each evaluation for 10 minutes before firing the alert. Elements that are active, but not firing yet, are in the pending state.
+`for`によって、初めて出力ベクトルの要素があった時から一定時間Prometheusを待機させ、アラートをfiringとみなす。
+この例では、Prometheusは、アラートが10分間の各評価でずっとアクティブであることを確認してからアラートをfiringにする。
+activeではあるがfiringでない要素は、pending状態である。
 
-The `labels` clause allows specifying a set of additional labels to be attached
-to the alert. Any existing conflicting labels will be overwritten. The label
-values can be templated.
+`labels`によって、アラートに追加的なラベル集合を付与できる。
+既にあるラベルと衝突した場合、既存ラベルが上書きされる。
+ラベルの値には、テンプレートが利用できる。
 
-The `annotations` clause specifies a set of informational labels that can be used to store longer additional information such as alert descriptions or runbook links. The annotation values can be templated.
+`annotations`は、アラート詳細や手順書へのリンクなどの長めの情報を追加するために利用されるラベルを指定する。
+アノテーションの値には、テンプレートが利用できる。
 
-#### Templating
+#### テンプレート
 
-Label and annotation values can be templated using [console templates](https://prometheus.io/docs/visualization/consoles).
-The `$labels` variable holds the label key/value pairs of an alert instance
-and `$value` holds the evaluated value of an alert instance.
+ラベルとアノテーションの値には[コンソールテンプレート](https://prometheus.io/docs/visualization/consoles)が利用できる。
+`$labels`は、アラートのラベルのキーバリューを保持し、`$value`は、アラートの評価値を保持している。
 
-    # To insert a firing element's label values:
+    # firingな要素のラベル値を挿入するには
     {{ $labels.<labelname> }}
-    # To insert the numeric expression value of the firing element:
+    # firingな要素の数値表現を挿入するには
     {{ $value }}
 
-Examples:
+例
 
 ```yaml
 groups:
@@ -77,27 +74,19 @@ groups:
       description: "{{ $labels.instance }} has a median request latency above 1s (current value: {{ $value }}s)"
 ```
 
-### Inspecting alerts during runtime
+### 実行時のアラートの調査
 
-To manually inspect which alerts are active (pending or firing), navigate to
-the "Alerts" tab of your Prometheus instance. This will show you the exact
-label sets for which each defined alert is currently active.
+どのアラートがactive（pendingまたはfiring）であるかを手動で調べるためには、PrometheusのAlertsタブにアクセスする。
+ここには、定義されたアラートそれぞれのがどのようなラベル集合に対して現在activeかが表示される。
 
-For pending and firing alerts, Prometheus also stores synthetic time series of
-the form `ALERTS{alertname="<alert name>", alertstate="pending|firing", <additional alert labels>}`.
-The sample value is set to `1` as long as the alert is in the indicated active
-(pending or firing) state, and the series is marked stale when this is no
-longer the case.
+pendingとfiringのアラートに関して、Prometheusは、`ALERTS{alertname="<alert name>", alertstate="pending|firing", <additional alert labels>}`という形式の時系列も保存する。
+アラートが指定されたactiveな状態（pendingまたはfiring）の間は値が1にセットされ、そうでなくなればstaleとみなされる。
 
-### Sending alert notifications
+### アラート通知の送信
 
-Prometheus's alerting rules are good at figuring what is broken *right now*, but
-they are not a fully-fledged notification solution. Another layer is needed to
-add summarization, notification rate limiting, silencing and alert dependencies
-on top of the simple alert definitions. In Prometheus's ecosystem, the
-[Alertmanager](https://prometheus.io/docs/alerting/alertmanager/) takes on this
-role. Thus, Prometheus may be configured to periodically send information about
-alert states to an Alertmanager instance, which then takes care of dispatching
-the right notifications.  
-Prometheus can be [configured](configuration.md) to automatically discovered available
-Alertmanager instances through its service discovery integrations.
+Prometheusのアラートルールは、**今**何が壊れているかを把握するのは得意であるが、本格的な通知のソリューションではない。
+ここで説明した簡単なアラートの定義を元にして、アラートをまとめたり、通知レートを制限したり、抑制したり、アラート同士の依存関係を定義したりするためには、別のレイヤーが必要である。
+Prometheusエコシステムでは、[Alertmanager](https://prometheus.io/docs/alerting/alertmanager/)がこの役割を担う。
+したがって、Prometheusは、定期的にアラートの状態に関する情報をAlertmanagerに送信するように設定することができる。
+Alertmanagerは、正しい通知の送信処理をする。
+Prometheusは、サービスディスカバリー連携を通して利用可能なAlertmanagerを自動的に検出するように[設定](configuration.md)することができる。

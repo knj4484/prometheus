@@ -1,19 +1,17 @@
 ---
-title: Template reference
+title: テンプレートのリファレンス
 sort_rank: 5
 ---
 
-# Template reference
+# テンプレートのリファレンス
 
-Prometheus supports templating in the annotations and labels of alerts,
-as well as in served console pages. Templates have the ability to run
-queries against the local database, iterate over data, use conditionals,
-format data, etc. The Prometheus templating language is based on the [Go
-templating](https://golang.org/pkg/text/template/) system.
+Prometheusは、コンソールページと同様に、アラートのアノテーションとラベルでテンプレートをサポートしている。
+テンプレートで、ローカルのデータベースに対してクエリを実行したり、繰り返し処理、条件分岐、フォーマットなどをすることが出来る。
+Prometheusのテンプレート言語は[Goのテンプレートシステム](https://golang.org/pkg/text/template/)に基づいている。
 
-## Data Structures
+## データ構造
 
-The primary data structure for dealing with time series data is the sample, defined as:
+時系列を扱うための最も重要なデータ構造は、以下のように定義されているサンプルである。
 
 ```go
 type sample struct {
@@ -22,93 +20,81 @@ type sample struct {
 }
 ```
 
-The metric name of the sample is encoded in a special `__name__` label in the `Labels` map.
+サンプルのメトリック名は、マップ`Labels`の特別なラベル`__name__`で表現されている。
 
-`[]sample` means a list of samples.
+`[]sample`は、サンプルのリストを意味する。
 
-`interface{}` in Go is similar to a void pointer in C.
+Goの`interface{}`は、Cのvoidポインターと似ている。
 
-## Functions
+## 関数
 
-In addition to the [default
-functions](https://golang.org/pkg/text/template/#hdr-Functions) provided by Go
-templating, Prometheus provides functions for easier processing of query
-results in templates.
+Goテンプレートが提供している[デフォルト関数](https://golang.org/pkg/text/template/#hdr-Functions)に加えて、Prometheusは、テンプレートの中でクエリー結果の処理を簡単にするための関数を提供している。
 
-If functions are used in a pipeline, the pipeline value is passed as the last argument.
+関数がパイプラインで使われている場合、パイプラインの値は最後の引数として渡される。
 
-### Queries
+### クエリ
 
-| Name          | Arguments     | Returns  | Notes    |
+|  名前         | 引数          | 戻り値   | 備考     |
 | ------------- | ------------- | -------- | -------- |
-| query         | query string  | []sample | Queries the database, does not support returning range vectors.  |
-| first         | []sample      | sample   | Equivalent to `index a 0`  |
-| label         | label, sample | string   | Equivalent to `index sample.Labels label`  |
-| value         | sample        | float64  | Equivalent to `sample.Value`  |
-| sortByLabel   | label, []samples | []sample | Sorts the samples by the given label. Is stable.  |
+| query         | query string  | []sample | データベースを検索する。rangevectorの返却はサポートしていない  |
+| first         | []sample      | sample   | `index a 0`と同じ |
+| label         | label, sample | string   | `index sample.Labels label`と同じ |
+| value         | sample        | float64  | `sample.Value` |
+| sortByLabel   | label, []samples | []sample | サンプルを指定されたラベルでソートする。安定なソートである。 |
 
-`first`, `label` and `value` are intended to make query results easily usable in pipelines.
+`first`、`label`、`value`は、クエリーの結果をパイプラインで簡単に使えるようにするためにある。
 
-### Numbers
+### 数値
 
-| Name          | Arguments     | Returns |  Notes    |
+|  名前         | 引数          | 戻り値   | 備考     |
 | ------------- | --------------| --------| --------- |
-| humanize      | number        | string  | Converts a number to a more readable format, using [metric prefixes](https://en.wikipedia.org/wiki/Metric_prefix).
-| humanize1024  | number        | string  | Like `humanize`, but uses 1024 as the base rather than 1000. |
-| humanizeDuration | number     | string  | Converts a duration in seconds to a more readable format. |
-| humanizeTimestamp | number    | string  | Converts a Unix timestamp in seconds to a more readable format. |
+| humanize      | number        | string  | [SI接頭辞](https://ja.wikipedia.org/wiki/SI接頭辞)を用いて、読みやすい形式に変換する |
+| humanize1024  | number        | string  | `humanize`に似ているが、基数として1000ではなく1024を用いる |
+| humanizeDuration | number     | string  | 秒単位の時間を読みやすい形式に変換する |
+| humanizeTimestamp | number    | string  | 秒単位のUnixタイムスタンプを読みやすい形式に変換する |
 
-Humanizing functions are intended to produce reasonable output for consumption
-by humans, and are not guaranteed to return the same results between Prometheus
-versions.
+humanize関数は、人間が利用するために適切な出力を生成するためにあり、Prometheusのバージョン間で同じ結果になることは保証されていない。
 
-### Strings
+### 文字列
 
-| Name          | Arguments     | Returns |    Notes    |
+|  名前         | 引数          | 戻り値   | 備考     |
 | ------------- | ------------- | ------- | ----------- |
-| title         | string        | string  | [strings.Title](https://golang.org/pkg/strings/#Title), capitalises first character of each word.|
-| toUpper       | string        | string  | [strings.ToUpper](https://golang.org/pkg/strings/#ToUpper), converts all characters to upper case.|
-| toLower       | string        | string  | [strings.ToLower](https://golang.org/pkg/strings/#ToLower), converts all characters to lower case.|
-| match         | pattern, text | boolean | [regexp.MatchString](https://golang.org/pkg/regexp/#MatchString) Tests for a unanchored regexp match. |
-| reReplaceAll  | pattern, replacement, text | string | [Regexp.ReplaceAllString](https://golang.org/pkg/regexp/#Regexp.ReplaceAllString) Regexp substitution, unanchored. |
-| graphLink  | expr | string | Returns path to graph view in the [expression browser](https://prometheus.io/docs/visualization/browser/) for the expression. |
-| tableLink  | expr | string | Returns path to tabular ("Console") view in the [expression browser](https://prometheus.io/docs/visualization/browser/) for the expression. |
+| title         | string        | string  | [strings.Title](https://golang.org/pkg/strings/#Title), 各単語の最初の文字を大文字にする |
+| toUpper       | string        | string  | [strings.ToUpper](https://golang.org/pkg/strings/#ToUpper), 全ての文字を大文字にする |
+| toLower       | string        | string  | [strings.ToLower](https://golang.org/pkg/strings/#ToLower), 全ての文字を小文字にする |
+| match         | pattern, text | boolean | [regexp.MatchString](https://golang.org/pkg/regexp/#MatchString) アンカーなしの正規表現マッチをテストする |
+| reReplaceAll  | pattern, replacement, text | string | [Regexp.ReplaceAllString](https://golang.org/pkg/regexp/#Regexp.ReplaceAllString) 正規表現置換。アンカーなし |
+| graphLink  | expr | string | 引数の式に対する[expressionブラウザ](https://prometheus.io/docs/visualization/browser/)のグラフビューへのパスを返す |
+| tableLink  | expr | string | 引数の式に対する[expressionブラウザ](https://prometheus.io/docs/visualization/browser/)の表（Console）ビューへのパスを返す |
 
-### Others
+### その他
 
-| Name          | Arguments     | Returns |    Notes    |
+|  名前         | 引数          | 戻り値   | 備考     |
 | ------------- | ------------- | ------- | ----------- |
-| args          | []interface{} | map[string]interface{} | This converts a list of objects to a map with keys arg0, arg1 etc. This is intended to allow multiple arguments to be passed to templates. |
-| tmpl          | string, []interface{} | nothing  | Like the built-in `template`, but allows non-literals as the template name. Note that the result is assumed to be safe, and will not be auto-escaped. Only available in consoles. |
-| safeHtml      | string        | string  | Marks string as HTML not requiring auto-escaping. |
+| args          | []interface{} | map[string]interface{} | オブジェクトのリストを、arg0、arg1などをキーに持つマップに変換する。これはテンプレートに複数の引数を渡すことが意図されている |
+| tmpl          | string, []interface{} | なし  | ビルトインの`template`と似ているが、テンプレート名にリテラルでないものが許される。結果が安全であることが仮定されており、自動的にエスケープされることはない。コンソールでのみ利用可能 |
+| safeHtml      | string        | string  | 自動的なエスケープを必要としないものとしてHTMLをマークする |
 
 ## Template type differences
 
-Each of the types of templates provide different information that can be used to
-parameterize templates, and have a few other differences.
+テンプレートの種類ごとに、テンプレートをパラメーター化するために利用可能な異なる情報を提供し、また、その他にも少しずつ違いがある。
 
-### Alert field templates
+### アラートのフィールドのテンプレート
 
-`.Value` and `.Labels` contain the alert value and labels. They are also exposed
-as the `$value` and `$labels` variables for convenience.
+`.Value`と`.Labels`には、アラートの値とラベルが入っている。
+利便性のために、これらは変数`$value`と`$labels`にも割り当てられている。
 
-### Console templates
+### コンソールのテンプレート
 
-Consoles are exposed on `/consoles/`, and sourced from the directory pointed to
-by the `-web.console.templates` flag.
+コンソールは、`/consoles/`で見ることができ、フラグ`-web.console.templates`で指定されたディレクトリが元になっている。
 
-Console templates are rendered with
-[html/template](https://golang.org/pkg/html/template/), which provides
-auto-escaping. To bypass the auto-escaping use the `safe*` functions.,
+コンソールテンプレートは、自動エスケープを行う[html/template](https://golang.org/pkg/html/template/)で展開される。
+自動エスケープを回避するには、関数`safe*`を利用する。
 
-URL parameters are available as a map in `.Params`. To access multiple URL
-parameters by the same name, `.RawParams` is a map of the list values for each
-parameter. The URL path is available in `.Path`, excluding the `/consoles/`
-prefix.
+URLパラメーターは、`.Params`でマップとして利用可能である。
+同じ名前の複数のURLパラメーターを利用するために、`.RawParams`が各パラメーターの値のリストのマップになっている。
+URLパス（プリフィックス`/consoles/`は除く）は、`.Path`で利用可能である。
 
-Consoles also have access to all the templates defined with `{{define
-"templateName"}}...{{end}}` found in `*.lib` files in the directory pointed to
-by the `-web.console.libraries` flag. As this is a shared namespace, take care
-to avoid clashes with other users. Template names beginning with `prom`,
-`_prom`, and `__` are reserved for use by Prometheus, as are the functions
-listed above.
+コンソールは、フラグ`-web.console.libraries`で指定されたディレクトリ内の`*.lib`ファイルにある`{{define "templateName"}}...{{end}}`で定義されたテンプレート全てを利用可能である。
+この名前空間は共有なので、他のユーザーとの衝突を回避するように気をつけること。
+`prom`、`_prom`、`__`で始まるテンプレート名は、上で一覧にされている関数と同様に、Prometheusによる利用のために予約されている。

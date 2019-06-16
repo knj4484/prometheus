@@ -1,52 +1,42 @@
 ---
-title: Migration
+title: 移行
 sort_rank: 7
 ---
 
-# Prometheus 2.0 migration guide
+# Prometheus 2.0移行ガイド
 
-In line with our [stability promise](https://prometheus.io/blog/2016/07/18/prometheus-1-0-released/#fine-print),
-the Prometheus 2.0 release contains a number of backwards incompatible changes.
-This document offers guidance on migrating from Prometheus 1.8 to Prometheus 2.0.
+[安定性の約束](https://prometheus.io/blog/2016/07/18/prometheus-1-0-released/#fine-print)に従って、Prometheus 2.0にはたくさんの後方非互換な変更が含まれている。
+このドキュメントは、Prometheus 1.8からPrometheus 2.0に移行するための手引きをする。
 
-## Flags
+## フラグ
 
-The format of the Prometheus command line flags has changed. Instead of a
-single dash, all flags now use a double dash. Common flags (`--config.file`,
-`--web.listen-address` and `--web.external-url`) are still the same but beyond
-that, almost all the storage-related flags have been removed.
+Prometheusのコマンドラインフラグの形式が変わった。
+1つのハイフンではなく、全てのフラグが2つのハイフンを使う。
+よく使われるフラグ（`--config.file`、`--web.listen-address`、`--web.external-url`）はそのままだが、それ以外は、ほぼ全てのストレージ関連のフラグが削除された。
 
-Some notable flags which have been removed:
+削除されたフラグの中で特筆すべきいくつかを挙げる。
 
-- `-alertmanager.url` In Prometheus 2.0, the command line flags for configuring
-  a static Alertmanager URL have been removed. Alertmanager must now be
-  discovered via service discovery, see [Alertmanager service discovery](#amsd).
+- `-alertmanager.url` Prometheus 2.0では、静的にAlertmanagerのURLを指定するためのコマンドラインフラグは削除された。
+  今は、サービスディスカバリーを通してAlertmanagerを検出する必要がある。[Alertmanagerサービスディスカバリー](#amsd)を参照。
 
-- `-log.format` In Prometheus 2.0 logs can only be streamed to standard error.
+- `-log.format` Prometheus 2.0では、標準エラーに流すことしかできない
 
-- `-query.staleness-delta` has been renamed to `--query.lookback-delta`; Prometheus
-  2.0 introduces a new mechanism for handling staleness, see [staleness](querying/basics.md#staleness).
+- `-query.staleness-delta`は`--query.lookback-delta`に名前が変更された。Prometheus 2.0で、データの失効を扱う新しい仕組みが導入された。[失効](querying/basics.md#staleness)を参照。
 
-- `-storage.local.*` Prometheus 2.0 introduces a new storage engine, as such all
-  flags relating to the old engine have been removed.  For information on the
-  new engine, see [Storage](#storage).
+- `-storage.local.*` Prometheus 2.0で、新しいストレージエンジンが導入され、古いエンジンに関する全てのフラグが削除された。新しいエンジンについての情報は、[ストレージ](#storage)を参照。
 
-- `-storage.remote.*` Prometheus 2.0 has removed the already deprecated remote
-  storage flags, and will fail to start if they are supplied. To write to
-  InfluxDB, Graphite, or OpenTSDB use the relevant storage adapter.
+- `-storage.remote.*` Prometheus 2.0では、既に非推奨になっていたリモートストレージのフラグが削除された。それらが指定されると起動に失敗するようになる。InfluxDB、Graphite、OpenTSDBに書き込むには、適切なアダプターを使うこと。
 
-## Alertmanager service discovery
+## Alertmanagerサービスディスカバリー
 
-Alertmanager service discovery was introduced in Prometheus 1.4, allowing Prometheus
-to dynamically discover Alertmanager replicas using the same mechanism as scrape
-targets. In Prometheus 2.0, the command line flags for static Alertmanager config
-have been removed, so the following command line flag:
+Alertmanagerサービスディスカバリーは、Prometheus 1.4で導入され、スクレイプ対象と同じ仕組みでPrometheusがAlertmanagerレプリカを動的に検出できるようになった。
+Prometheus 2.0では、静的にAlertmanagerを設定するフラグが削除された。従って、以下のコマンドラインフラグは、
 
 ```
 ./prometheus -alertmanager.url=http://alertmanager:9093/
 ```
 
-Would be replaced with the following in the `prometheus.yml` config file:
+以下の設定ファイル`prometheus.yml`で置き換えられることになるだろう。
 
 ```yaml
 alerting:
@@ -56,10 +46,8 @@ alerting:
       - alertmanager:9093
 ```
 
-You can also use all the usual Prometheus service discovery integrations and
-relabeling in your Alertmanager configuration. This snippet instructs
-Prometheus to search for Kubernetes pods, in the `default` namespace, with the
-label `name: alertmanager` and with a non-empty port.
+Alertmanagerの設定では、通常のPrometheusのサービスディスカバリー連携全てとリラベルも利用できる。
+以下のスニペットは、Kubernetesの名前空間`default`にあり、ラベル`name: alertmanager`を持ち、ポートが空でないpodをPrometheusに検索するように指示している。
 
 ```yaml
 alerting:
@@ -81,10 +69,10 @@ alerting:
       action: drop
 ```
 
-## Recording rules and alerts
+## レコーディングルールとアラート
 
-The format for configuring alerting and recording rules has been changed to YAML.
-An example of a recording rule and alert in the old format:
+アラートとレコーディングルールを設定する形式がYAMLに変更された。
+以下の旧形式のレコーディングルールとアラートの例は、
 
 ```
 job:request_duration_seconds:histogram_quantile99 =
@@ -98,7 +86,7 @@ ALERT FrontendRequestLatency
   }
 ```
 
-Would look like this:
+次のようになるだろう。
 
 ```yaml
 groups:
@@ -114,36 +102,34 @@ groups:
       summary: High frontend request latency
 ```
 
-To help with the change, the `promtool` tool has a mode to automate the rules conversion.  Given a `.rules` file, it will output a `.rules.yml` file in the
-new format. For example:
+変更の手助けとなるよう、ツール`promtool`には、ルールの変換を自動化するためのモードがある。
+`.rules`ファイルが与えられると、新形式の`.rules.yml`ファイルを出力する。
+例えば、以下のように実行する。
 
 ```
 $ promtool update rules example.rules
 ```
 
-Note that you will need to use promtool from 2.0, not 1.8.
+1.8ではなく2.0のpromtoolを使う必要があることに注意。
 
-## Storage
+## ストレージ
 
-The data format in Prometheus 2.0 has completely changed and is not backwards
-compatible with 1.8. To retain access to your historic monitoring data we
-recommend you run a non-scraping Prometheus instance running at least version
-1.8.1 in parallel with your Prometheus 2.0 instance, and have the new server
-read existing data from the old one via the remote read protocol.
+Prometheus 2.0のデータ形式は、根本的に変更され、1.8との後方互換性はない。
+過去の監視データを利用し続けるためには、スクレイプをしないPrometheusインスタンスを最低のバージョン１.8.1でPrometheus 2.0と平行して稼働させて、新しいサーバーがremote readプロトコルを通して古いサーバーの既存データを読み込むようにすることを推奨する。
 
-Your Prometheus 1.8 instance should be started with the following flags and an
-config file containing only the `external_labels` setting (if any):
+Prometheus 1.8のインスタンスは、以下のフラグと（もしあれば）`external_labels`のみを含む設定ファイルで起動するべきである。
 
 ```
 $ ./prometheus-1.8.1.linux-amd64/prometheus -web.listen-address ":9094" -config.file old.yml
 ```
 
-Prometheus 2.0 can then be started (on the same machine) with the following flags:
+これで、Prometheus 2.0は、（同じマシン上で）以下のフラグで起動できる。
 
 ```
 $ ./prometheus-2.0.0.linux-amd64/prometheus --config.file prometheus.yml
 ```
 
+`prometheus.yml`が既存の完全な設定XXX
 Where `prometheus.yml` contains in addition to your full existing configuration, the stanza:
 
 ```yaml
@@ -153,7 +139,11 @@ remote_read:
 
 ## PromQL
 
-The following features have been removed from PromQL:
+以下の昨日は、PromQLから削除された。
+
+- `drop_common_labels`関数 - `without`集約修飾子を代わりに使うべきである
+- `keep_common`集約修飾子 - `by`修飾子を代わりに使うべきである
+- `count_scalar`関数 - `absent()`の方がうまく処理できる。演算でラベルをXXX
 
 - `drop_common_labels` function - the `without` aggregation modifier should be used
   instead.
@@ -161,17 +151,15 @@ The following features have been removed from PromQL:
 - `count_scalar` function - use cases are better handled by `absent()` or correct
   propagation of labels in operations.
 
-See [issue #3060](https://github.com/prometheus/prometheus/issues/3060) for more
-details.
+詳細は、[issue #3060](https://github.com/prometheus/prometheus/issues/3060)を参照。
 
 ## Miscellaneous
 
 ### Prometheus non-root user
 
-The Prometheus Docker image is now built to [run Prometheus
-as a non-root user](https://github.com/prometheus/prometheus/pull/2859). If you
-want the Prometheus UI/API to listen on a low port number (say, port 80), you'll
-need to override it. For Kubernetes, you would use the following YAML:
+PrometheusのDockerイメージは、[root以外のユーザーでPrometheusを実行する](https://github.com/prometheus/prometheus/pull/2859)ようにビルドされている。
+PrometheusのUI/APIが小さいポート番号（例えば80番ポート）をリッスンするようにしたい場合、これを上書きする必要がある。
+Kubernetesでは、以下のYAMLを使うことになるだろう。
 
 ```yaml
 apiVersion: v1
@@ -184,10 +172,9 @@ spec:
 ...
 ```
 
-See [Configure a Security Context for a Pod or Container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)
-for more details.
+詳細は、[Configure a Security Context for a Pod or Container](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)を参照。
 
-If you're using Docker, then the following snippet would be used:
+Dockerを使っている場合、以下のスニペットが利用されるだろう。
 
 ```
 docker run -u root -p 80:80 prom/prometheus:v2.0.0-rc.2  --web.listen-address :80
@@ -195,7 +182,5 @@ docker run -u root -p 80:80 prom/prometheus:v2.0.0-rc.2  --web.listen-address :8
 
 ### Prometheus lifecycle
 
-If you use the Prometheus `/-/reload` HTTP endpoint to [automatically reload your
-Prometheus config when it changes](configuration/configuration.md),
-these endpoints are disabled by default for security reasons in Prometheus 2.0.
-To enable them, set the `--web.enable-lifecycle` flag.
+[Prometheusの設定が変更された場合に自動的に設定を再読み込みする](configuration/configuration.md)ためにPrometheusのHTTPエンドポイント`/-/reload`を利用するなら、Prometheus 2.0では、セキュリティの理由で、これらのエンドポイントはデフォルトで無効にされている。
+これらを有効にするには、フラグ`--web.enable-lifecycle`をセットする。

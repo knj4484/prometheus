@@ -1,94 +1,122 @@
 ---
-title: Storage
+title: ストレージ
 sort_rank: 5
 ---
 
-# Storage
+# ストレージ
 
-Prometheus includes a local on-disk time series database, but also optionally integrates with remote storage systems.
+Prometheusは、ローカルのディスク上に時系列データベースを持っているが、オプションでリモートのストレージシステムとも連携する。
 
-## Local storage
+## ローカルストレージ
 
-Prometheus's local time series database stores time series data in a custom format on disk.
+Prometheusのローカル時系列データーベースは、時系列データを独自フォーマットでディスク上に保存する。
 
-### On-disk layout
+### ディクス上の構成
 
-Ingested samples are grouped into blocks of two hours. Each two-hour block consists of a directory containing one or more chunk files that contain all time series samples for that window of time, as well as a metadata file and index file (which indexes metric names and labels to time series in the chunk files).  When series are deleted via the API, deletion records are stored in separate tombstone files (instead of deleting the data immediately from the chunk files).
+取り込まれた値は、2時間のブロックにまとめられる。
+2時間のブロックそれぞれは、1つ以上のチャンクファイル、メタデータファイル、インデックスファイルを含むディレクトリから成る。
+チャンクファイルは、その時間の時系列の全ての値とを含む。
+インデックスファイルは、メトリック名とラベルからチャンクファイル内の時系列へのインデックスを含む。
+時系列がAPIを通して削除されると、削除レコードが別のtombstoneファイルに保存される（データはチャンクファイルから即時に削除されない）。
 
-The block for currently incoming samples is kept in memory and not fully persisted yet. It is secured against crashes by a write-ahead-log (WAL) that can be replayed when the Prometheus server restarts after a crash. Write-ahead log files are stored in the `wal` directory in 128MB segments. These files contain raw data that has not been compacted yet, so they are significantly larger than regular block files. Prometheus will keep a minimum of 3 write-ahead log files, however high-traffic servers may see more than three WAL files since it needs to keep at least two hours worth of raw data.
+現在取り込みつつある値は、メモリに保持され、完全に永続化はまだされていない。
+クラッシュに対して安全にするためにwrite-ahead-log（WAL）が利用される。
+write-ahead logは、Prometheusサーバーがクラッシュ後に再起動した際にやり直しが出来る。
+Write-ahead logファイルはディレクトリ`wal`に128MBセグメントで保存される。
+これらのファイルは、まだコンパクト化されていない生データを含むので、通常のブロックファイルよりかなり大きい。
+Prometheusは、少なくとも3つのwrite-ahead logを保持するが、トラフィックの多いサーバーでは、3つより多いWALファイルが見れらる。
+なぜなら、少なくとも2時間相当の生データを保持しなければならないからである。
 
-The directory structure of a Prometheus server's data directory will look something like this:
+Prometheusサーバーのデータディレクトリの構成は、以下のようなものになるだろう。
 
 ```
-./data/01BKGV7JBM69T2G1BGBGM6KB12
-./data/01BKGV7JBM69T2G1BGBGM6KB12/meta.json
-./data/01BKGTZQ1SYQJTR4PB43C8PD98
-./data/01BKGTZQ1SYQJTR4PB43C8PD98/meta.json
-./data/01BKGTZQ1SYQJTR4PB43C8PD98/index
-./data/01BKGTZQ1SYQJTR4PB43C8PD98/chunks
-./data/01BKGTZQ1SYQJTR4PB43C8PD98/chunks/000001
-./data/01BKGTZQ1SYQJTR4PB43C8PD98/tombstones
-./data/01BKGTZQ1HHWHV8FBJXW1Y3W0K
-./data/01BKGTZQ1HHWHV8FBJXW1Y3W0K/meta.json
-./data/01BKGV7JC0RY8A6MACW02A2PJD
-./data/01BKGV7JC0RY8A6MACW02A2PJD/meta.json
-./data/01BKGV7JC0RY8A6MACW02A2PJD/index
-./data/01BKGV7JC0RY8A6MACW02A2PJD/chunks
-./data/01BKGV7JC0RY8A6MACW02A2PJD/chunks/000001
-./data/01BKGV7JC0RY8A6MACW02A2PJD/tombstones
-./data/wal/00000000
-./data/wal/00000001
-./data/wal/00000002
+./data
+├── 01BKGV7JBM69T2G1BGBGM6KB12
+│   └── meta.json
+├── 01BKGTZQ1SYQJTR4PB43C8PD98
+│   ├── chunks
+│   │   └── 000001
+│   ├── tombstones
+│   ├── index
+│   └── meta.json
+├── 01BKGTZQ1HHWHV8FBJXW1Y3W0K
+│   └── meta.json
+├── 01BKGV7JC0RY8A6MACW02A2PJD
+│   ├── chunks
+│   │   └── 000001
+│   ├── tombstones
+│   ├── index
+│   └── meta.json
+└── wal
+    ├── 00000002
+    └── checkpoint.000001
 ```
 
-The initial two-hour blocks are eventually compacted into longer blocks in the background.
+最初の2時間のブロックは、最終的にバックグラウンドでより長いブロックへとコンパクト化される。
 
-Note that a limitation of the local storage is that it is not clustered or replicated. Thus, it is not arbitrarily scalable or durable in the face of disk or node outages and should thus be treated as more of an ephemeral sliding window of recent data. However, if your durability requirements are not strict, you may still succeed in storing up to years of data in the local storage.
+ローカルストレージの制限は、クラスタ化されたり複製されたりしないことである。
+したがって、自由にスケールしないし、ディスクやノードの停止に耐えられず、短期の時間枠の最近のデータとして扱われるべきである。
+ただし、耐久性の要件が厳格でなければ、ローカルストレージに何年ものデータを保存し続けることが出来ることもある。
 
-For further details on file format, see [TSDB format](https://github.com/prometheus/tsdb/blob/master/docs/format/README.md).
+ファイルフォーマットのさらなる詳細は、[TSDB format](https://github.com/prometheus/tsdb/blob/master/docs/format/README.md)を参照すること。
 
-## Operational aspects
+## 運用に関わる側面
 
-Prometheus has several flags that allow configuring the local storage. The most important ones are:
+Prometheusには、ローカルストレージを設定するいくつかのフラグがある。
+特に重要なものは、以下の通り。
 
-* `--storage.tsdb.path`: This determines where Prometheus writes its database. Defaults to `data/`.
-* `--storage.tsdb.retention.time`: This determines when to remove old data. Defaults to `15d`. Overrides `storage.tsdb.retention` if this flag is set to anything other than default.
-* `--storage.tsdb.retention.size`: [EXPERIMENTAL] This determines the maximum number of bytes that storage blocks can use (note that this does not include the WAL size, which can be substantial). The oldest data will be removed first. Defaults to `0` or disabled. This flag is experimental and can be changed in future releases. Units supported: KB, MB, GB, PB. Ex: "512MB"
-* `--storage.tsdb.retention`: This flag has been deprecated in favour of `storage.tsdb.retention.time`.
+* `--storage.tsdb.path`: Prometheusがどこにデータベースを書き込むかを決める。デフォルトは、`data/`
+* `--storage.tsdb.retention.time`: 古いデータをいつ削除するかを決める。デフォルトは、15d。storage.tsdb.retentionがデフォルト以外にセットされていたら、上書きする
+* `--storage.tsdb.retention.size`: [EXPERIMENTAL] ストレージのブロックが利用できる最大バイト数を決める。WALはかなりのサイズに成るが、これには含まれていないことに注意。最も古いデータが最初に削除される。デフォルトは0、つまり無効化されている。このフラグは、実験的であり、将来のリリースで変更される可能性がある。サポートされている単位は、KB、MB、GB、PB. 例: "512MB"
+* `--storage.tsdb.retention`: このフラグは非推奨である。`storage.tsdb.retention.time`を利用するのが望ましい。
 
-On average, Prometheus uses only around 1-2 bytes per sample. Thus, to plan the capacity of a Prometheus server, you can use the rough formula:
+Prometheusは、平均的に、1つの観測値につき大体1〜2バイトしか使わない。
+したがって、Prometheusサーバーのキャパシティを計画するには、以下の式を利用することができる。
 
 ```
 needed_disk_space = retention_time_seconds * ingested_samples_per_second * bytes_per_sample
 ```
 
-To tune the rate of ingested samples per second, you can either reduce the number of time series you scrape (fewer targets or fewer series per target), or you can increase the scrape interval. However, reducing the number of series is likely more effective, due to compression of samples within a series.
+*訳注: 必要なディスクスペース = 保持期間（秒） * 秒間サンプル採取数 * サンプルのバイト数*
 
-If your local storage becomes corrupted for whatever reason, your best bet is to shut down Prometheus and remove the entire storage directory. Non POSIX compliant filesystems are not supported by Prometheus's local storage, corruptions may happen, without possibility to recover. NFS is only potentially POSIX, most implementations are not. You can try removing individual block directories to resolve the problem, this means losing a time window of around two hours worth of data per block directory. Again, Prometheus's local storage is not meant as durable long-term storage.
+秒間サンプル採取数を調整するために、取得する時系列の数を減らす（ターゲットを少なくしたりターゲットあたりの時系列を少なくする）か取得間隔を長くすることができる。
+ただし、1つの時系列の中で観測値の圧縮があるので、時系列の数を減らす方が効果的である可能性が高い。
 
-If both time and size retention policies are specified, whichever policy triggers first will be used at that instant.
+もし、ローカルストレージが壊れたら、理由が何であれ、Prometheusを停止してストレージディレクトリ全体を消すのが最善策である。
+POSIX互換でないファイルシステムは、Prometheusのローカルストレージでサポートされていない。
+復元の可能性のない破壊が起きる可能性がある。
+NFSは、POSIXの可能性はあるが、ほとんどの実装はPOSIXではない。
+問題を解決するために、個々のブロックディレクトリを削除することも可能だが、ブロックディレクトリ毎に約2時間相当のデータを失うことになる。
+Prometheusのローカルストレージは、長期保存に耐えられるようには意図されていないのである。
 
-## Remote storage integrations
+時間と容量の両方の保持ポリシーが指定されている場合、先に引っかかった条件がその時点で使われる。
 
-Prometheus's local storage is limited by single nodes in its scalability and durability. Instead of trying to solve clustered storage in Prometheus itself, Prometheus has a set of interfaces that allow integrating with remote storage systems.
+## リモートストレージ連携
 
-### Overview
+Prometheusのローカルストレージは、スケーラビリティと耐久性の点で、1つのノードに制限されている。
+Prometheus自体でクラスタ化されたストレージに対処する代わりに、Prometheusにはリモートストレージシステムと連携するインターフェースがある。
 
-Prometheus integrates with remote storage systems in two ways:
+### 概要
 
-* Prometheus can write samples that it ingests to a remote URL in a standardized format.
-* Prometheus can read (back) sample data from a remote URL in a standardized format.
+Prometheusは、以下の2つの方法でリモートストレージシステムと連携する。
+
+* Prometheusは、取り込んだ値を標準化されたフォーマットでリモートURLに書き込むことができる
+* Prometheusは、標準化されたフォーマットでリモートURLから値を読み取ることができる
 
 ![Remote read and write architecture](images/remote_integrations.png)
 
-The read and write protocols both use a snappy-compressed protocol buffer encoding over HTTP. The protocols are not considered as stable APIs yet and may change to use gRPC over HTTP/2 in the future, when all hops between Prometheus and the remote storage can safely be assumed to support HTTP/2.
+読み書きのプロトコルはどちらもsnappyで圧縮されたプロトコルバッファをHTTP越しに利用する。
+これらのプロトコルはまだ安定したAPIと見なされておらず、将来的には、Prometheusとリモートストレージの間の経路が全てHTTP/2をサポートしたと仮定できるようになれば、gRPC over HTTP/2に変わるかもしれない。
 
-For details on configuring remote storage integrations in Prometheus, see the [remote write](configuration/configuration.md#remote_write) and [remote read](configuration/configuration.md#remote_read) sections of the Prometheus configuration documentation.
+Prometheusのリモートストレージ連携の設定に関する詳細は、Prometheus設定ドキュメントの[remote write](http://it-engineer.hateblo.jp/entry/2019/05/02/154006)と[remote read](http://it-engineer.hateblo.jp/entry/2019/05/02/153031)の部分を参照すること。
 
-For details on the request and response messages, see the [remote storage protocol buffer definitions](https://github.com/prometheus/prometheus/blob/master/prompb/remote.proto).
+リクエストとレスポンスのメッセージに関する詳細は、[リモートストレージプロトコルバッファの定義](https://github.com/prometheus/prometheus/blob/master/prompb/remote.proto)を参照すること。
 
-Note that on the read path, Prometheus only fetches raw series data for a set of label selectors and time ranges from the remote end. All PromQL evaluation on the raw data still happens in Prometheus itself. This means that remote read queries have some scalability limit, since all necessary data needs to be loaded into the querying Prometheus server first and then processed there. However, supporting fully distributed evaluation of PromQL was deemed infeasible for the time being.
+読み込む行程では、Prometheusはラベルセレクターの集合と時間幅に対する生の時系列データを取得するだけであることに注意すること。
+生データに対するPromQLの全ての評価はPrometheus自体の中で起きる。
+つまり、必要なデータは全てクエリを発行しているPrometheusサーバーにまず読み込まれてその後Prometheusサーバで処理される必要があるので、remote readのクエリにはスケーラビリティの制限がある。
+しかし、完全に分散されたPromQLの評価をサポートすることはしばらくの間は不可能だと考えられている。
 
-### Existing integrations
+### 既存の連携
 
-To learn more about existing integrations with remote storage systems, see the [Integrations documentation](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
+リモートストレージとの既存の連携についてさらに学ぶには、[インテグレーション](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage)のドキュメントを参照すること。

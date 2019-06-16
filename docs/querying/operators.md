@@ -1,118 +1,96 @@
 ---
-title: Operators
+title: 演算子
 sort_rank: 2
 ---
 
-# Operators
+# 演算子
 
-## Binary operators
+## 二項演算子
 
-Prometheus's query language supports basic logical and arithmetic operators.
-For operations between two instant vectors, the [matching behavior](#vector-matching)
-can be modified.
+Prometheusのクエリ言語は基本的な論理・算術演算子をサポートしている。
+instanceベクトル間の演算に対しては、[マッチングの振る舞い](#vector-matching)を変更することができる。
 
-### Arithmetic binary operators
+### 算術二項演算子
 
-The following binary arithmetic operators exist in Prometheus:
+Prometheusには以下の二項算術演算子が存在する。
 
-* `+` (addition)
-* `-` (subtraction)
-* `*` (multiplication)
-* `/` (division)
-* `%` (modulo)
-* `^` (power/exponentiation)
+* `+` （加算）
+* `-` （減算）
+* `*` （乗算）
+* `/` （除算）
+* `%` （モジュロ）
+* `^` （累乗/指数）
 
-Binary arithmetic operators are defined between scalar/scalar, vector/scalar,
-and vector/vector value pairs.
+二項算術演算子は、scalar/scalar、vector/scalar、vector/vectorの値の組み合わせの間で定義される。
 
-**Between two scalars**, the behavior is obvious: they evaluate to another
-scalar that is the result of the operator applied to both scalar operands.
+**2つのスカラー間**での振る舞いは明らかである。両方のスカラーのオペランドに演算子を適用した結果のスカラーに評価される。
 
-**Between an instant vector and a scalar**, the operator is applied to the
-value of every data sample in the vector. E.g. if a time series instant vector
-is multiplied by 2, the result is another vector in which every sample value of
-the original vector is multiplied by 2.
+**instantベクトルとスカラーの間**では、演算子はベクトルのそれぞれの値に適用される。
+つまり、時系列のinstantベクトルが2倍されると、結果は、元のベクトルのそれぞれの値が2倍されたベクトルである。
 
-**Between two instant vectors**, a binary arithmetic operator is applied to
-each entry in the left-hand side vector and its [matching element](#vector-matching)
-in the right-hand vector. The result is propagated into the result vector and the metric
-name is dropped. Entries for which no matching entry in the right-hand vector can be
-found are not part of the result.
+**2つのinstantベクトルの間**では、二項算術演算子は、左辺ベクトルの各要素とその対応する右辺ベクトルの要素に適用される。
+その結果が結果ベクトルに伝達されて、メトリック名は削除される。
+右辺に対応する要素がない要素は、結果ベクトルからもなくなる。
 
-### Comparison binary operators
+### 比較二項演算子
 
-The following binary comparison operators exist in Prometheus:
+Prometheusには以下の二項比較演算子が存在する。
 
-* `==` (equal)
-* `!=` (not-equal)
-* `>` (greater-than)
-* `<` (less-than)
-* `>=` (greater-or-equal)
-* `<=` (less-or-equal)
+* `==` （等しい）
+* `!=` （等しくない）
+* `>` （より大きい）
+* `<` （より小さい）
+* `>=` （より大きいまたは等しい）
+* `<=` （より小さいまたは等しい）
 
-Comparison operators are defined between scalar/scalar, vector/scalar,
-and vector/vector value pairs. By default they filter. Their behavior can be
-modified by providing `bool` after the operator, which will return `0` or `1`
-for the value rather than filtering.
+比較演算子は、scalar/scalar、vector/scalar、vector/vectorの値の組み合わせの間で定義される。
+デフォルトで、これらはフィルターである。
+これらの振る舞いは、演算子の後に`bool`を与えることで、フィルタリングではなく、`0`または`1`を返すように変更出来る。
 
-**Between two scalars**, the `bool` modifier must be provided and these
-operators result in another scalar that is either `0` (`false`) or `1`
-(`true`), depending on the comparison result.
+**2つのスカラー間**では、`bool`修飾子が与えられる必要があり、演算子の結果は、比較の結果に基づいて`0`(`false`)または`1`(`true`)のスカラーとなる。
 
-**Between an instant vector and a scalar**, these operators are applied to the
-value of every data sample in the vector, and vector elements between which the
-comparison result is `false` get dropped from the result vector. If the `bool`
-modifier is provided, vector elements that would be dropped instead have the value
-`0` and vector elements that would be kept have the value `1`.
+**instantベクトルとスカラーの間**では、演算子はベクトルのそれぞれの値に適用される。
+比較結果が`false`となるベクトルの要素は結果ベクトルから削除される。
+`bool`修飾子が与えられると、削除されるはずだったベクトル要素は`0`、保持されるはずだったベクトル要素は`1`の値を持つようになる。
 
-**Between two instant vectors**, these operators behave as a filter by default,
-applied to matching entries. Vector elements for which the expression is not
-true or which do not find a match on the other side of the expression get
-dropped from the result, while the others are propagated into a result vector
-with their original (left-hand side) metric names and label values.
-If the `bool` modifier is provided, vector elements that would have been
-dropped instead have the value `0` and vector elements that would be kept have
-the value `1` with the left-hand side label values.
+**2つのinstantベクトルの間**では、デフォルトで、対応する要素に適用されたフィルターとして振る舞う。
+結果がtrueでないまたは他方の辺に対応する要素がない要素は、結果から削除される。その他の要素は、結果ベクトルに伝達され、元の（左辺の）メトリック名とラベルが付けられる。
+`bool`修飾子が与えられると、削除されるはずだったベクトル要素は`0`、保持されるはずだったベクトル要素は`1`の値を持つようになり、左辺のラベル値が付けられる。
 
-### Logical/set binary operators
+### 論理/集合二項演算子
 
-These logical/set binary operators are only defined between instant vectors:
+これらの論理/集合二項演算子は、instantベクトル間にのみ定義される。
 
-* `and` (intersection)
-* `or` (union)
-* `unless` (complement)
+* `and` （交差）
+* `or` （和）
+* `unless` （complement）
 
-`vector1 and vector2` results in a vector consisting of the elements of
-`vector1` for which there are elements in `vector2` with exactly matching
-label sets. Other elements are dropped. The metric name and values are carried
-over from the left-hand side vector.
+`vector1 and vector2`は、`vector2`にラベル集合が完全にマッチする要素がある`vector1`の要素からなるベクトルになる。
+その他の要素は削除される。
+メトリック名と値は、左辺ベクトルから引き継がれる。
 
-`vector1 or vector2` results in a vector that contains all original elements
-(label sets + values) of `vector1` and additionally all elements of `vector2`
-which do not have matching label sets in `vector1`.
+`vector1 or vector2`は、`vector1`の全ての要素（ラベル集合＋値）および`vector1`に対応するラベル集合のない全ての`vector2`の要素からなるベクトルになる。
 
-`vector1 unless vector2` results in a vector consisting of the elements of
-`vector1` for which there are no elements in `vector2` with exactly matching
-label sets. All matching elements in both vectors are dropped.
+`vector1 unless vector2`は、ラベル集合が完全にマッチする要素が`vector2`にない`vector1`の要素からなるベクトルになる。
+両辺のベクトルでマッチする全ての要素は削除される。
 
-## Vector matching
+## ベクトルマッチング
 
-Operations between vectors attempt to find a matching element in the right-hand side
-vector for each entry in the left-hand side. There are two basic types of
-matching behavior: One-to-one and many-to-one/one-to-many.
+ベクトル間の演算は、左辺の要素それぞれに対して、右辺ベクトルから対応する要素を見つけようとする。
+対応させる（matching）振る舞いには2つの基本的な種類（1対1および多対1/1対多）がある。
 
-### One-to-one vector matches
+### 1対1マッチング
 
-**One-to-one** finds a unique pair of entries from each side of the operation.
-In the default case, that is an operation following the format `vector1 <operator> vector2`.
-Two entries match if they have the exact same set of labels and corresponding values.
-The `ignoring` keyword allows ignoring certain labels when matching, while the
-`on` keyword allows reducing the set of considered labels to a provided list:
+**1対1マッチング**では、演算子の両辺からユニークなペアを取得する。
+デフォルトケースでは、`vector1 <operator> vector2`という形式の演算である。
+2つのエントリがマッチングされるのは、完全に同じラベル集合およびその値を持つ場合である。
+これに対して、`ignoring`キーワードによって、マッチングする時に特定のラベルを無視することができる。
+また、`on`キーワードによって、考慮するラベルを減らすことができる。
 
     <vector expr> <bin-op> ignoring(<label list>) <vector expr>
     <vector expr> <bin-op> on(<label list>) <vector expr>
 
-Example input:
+入力例:
 
     method_code:http_errors:rate5m{method="get", code="500"}  24
     method_code:http_errors:rate5m{method="get", code="404"}  30
@@ -124,63 +102,51 @@ Example input:
     method:http_requests:rate5m{method="del"}  34
     method:http_requests:rate5m{method="post"} 120
 
-Example query:
+クエリ例:
 
     method_code:http_errors:rate5m{code="500"} / ignoring(code) method:http_requests:rate5m
 
-This returns a result vector containing the fraction of HTTP requests with status code
-of 500 for each method, as measured over the last 5 minutes. Without `ignoring(code)` there
-would have been no match as the metrics do not share the same set of labels.
-The entries with methods `put` and `del` have no match and will not show up in the result:
+これは、直近5分間における各メソッドに対するステータスが500となったHTTPリクエストの割合を返す。
+仮に`ignoring(code)`を付けないと、ラベル集合が完全に同じメトリクスはなくなってしまう。
+また、`put`と`del`メソッドは、マッチするものがないので結果には含まれない。
 
     {method="get"}  0.04            //  24 / 600
     {method="post"} 0.05            //   6 / 120
 
-### Many-to-one and one-to-many vector matches
+### 多対1/1対多マッチング
 
-**Many-to-one** and **one-to-many** matchings refer to the case where each vector element on
-the "one"-side can match with multiple elements on the "many"-side. This has to
-be explicitly requested using the `group_left` or `group_right` modifier, where
-left/right determines which vector has the higher cardinality.
+**多対1/1対多マッチング**とは、1の側のベクトル要素それぞれが多の側の複数の要素と対応するような場合のことをいう。
+片側の要素を逆側の複数の要素とマッチングさせるには、明示的に`group_left`または`group_right`を利用する必要がある。
+left/rightによって、左右どちらを複数要素にマッチングさせるかが決まる。
 
     <vector expr> <bin-op> ignoring(<label list>) group_left(<label list>) <vector expr>
     <vector expr> <bin-op> ignoring(<label list>) group_right(<label list>) <vector expr>
     <vector expr> <bin-op> on(<label list>) group_left(<label list>) <vector expr>
     <vector expr> <bin-op> on(<label list>) group_right(<label list>) <vector expr>
 
-The label list provided with the group modifier contains additional labels from
-the "one"-side to be included in the result metrics. For `on` a label can only
-appear in one of the lists. Every time series of the result vector must be
-uniquely identifiable.
+グループ修飾子と共に与えられるラベルリストは、結果のメトリクスに含まれるべきラベルが含まれる。
+`on`を使う場合、ラベルはどちらか一方のラベルリストにのみ含むことができる。
+結果のベクトルに含まれる各時系列は、ユニークに特定されなければならない。
 
-_Grouping modifiers can only be used for
-[comparison](#comparison-binary-operators) and
-[arithmetic](#arithmetic-binary-operators). Operations as `and`, `unless` and
-`or` operations match with all possible entries in the right vector by
-default._
+_グルーピング修飾子が使えるのは、[比較](#comparison-binary-operators)と[算術](#arithmetic-binary-operators)だけである。`and`および`unless`、`or`演算子は、デフォルトでは、右辺のvectorの全ての可能な要素にマッチする。_
 
-Example query:
+クエリ例:
 
     method_code:http_errors:rate5m / ignoring(code) group_left method:http_requests:rate5m
 
-In this case the left vector contains more than one entry per `method` label
-value. Thus, we indicate this using `group_left`. The elements from the right
-side are now matched with multiple elements with the same `method` label on the
-left:
+この例では左辺のベクトルには、`method`ラベルの一つの値に対して複数のエントリーがあるので、`group_left`を使う。
+右辺の要素は、同じ`method`ラベルの値を持つ左辺の複数の要素にマッチングされる。
 
     {method="get", code="500"}  0.04            //  24 / 600
     {method="get", code="404"}  0.05            //  30 / 600
     {method="post", code="500"} 0.05            //   6 / 120
     {method="post", code="404"} 0.175           //  21 / 120
 
-_Many-to-one and one-to-many matching are advanced use cases that should be carefully considered.
-Often a proper use of `ignoring(<labels>)` provides the desired outcome._
+_多対1/1対多マッチングは高度なユースケースであり、慎重に使うべきである。多くの場合、`ignoring(<labels>)`で所望の結果が得られる。_
 
-## Aggregation operators
+## 集約演算子
 
-Prometheus supports the following built-in aggregation operators that can be
-used to aggregate the elements of a single instant vector, resulting in a new
-vector of fewer elements with aggregated values:
+Prometheusは以下のビルトイン集約演算子をサポートする。これらの演算子で、一つのinstance vectorの要素を集約し、集約されて少なくなった要素からなる新しいベクトルを得ることができる。
 
 * `sum` (calculate sum over dimensions)
 * `min` (select minimum over dimensions)
@@ -194,55 +160,47 @@ vector of fewer elements with aggregated values:
 * `topk` (largest k elements by sample value)
 * `quantile` (calculate φ-quantile (0 ≤ φ ≤ 1) over dimensions)
 
-These operators can either be used to aggregate over **all** label dimensions
-or preserve distinct dimensions by including a `without` or `by` clause.
+これらの演算子は、**全て**のラベルにまがたって集約することもできるし、`without`や`by`を含めることで個別のラベルを残すこともできる。
 
     <aggr-op>([parameter,] <vector expression>) [without|by (<label list>)]
 
-`parameter` is only required for `count_values`, `quantile`, `topk` and
-`bottomk`. `without` removes the listed labels from the result vector, while
-all other labels are preserved the output. `by` does the opposite and drops
-labels that are not listed in the `by` clause, even if their label values are
-identical between all elements of the vector.
+パラメーターが必要なのは、`count_values`、`quantile`、`topk`、`bottomk`だけである。
+`without`は、結果のベクトルから`label list`に含まれるラベルを取り除き、他の全てのラベルを結果のベクトルに残す。
+`by`は、`without`とは逆に、`label list`に含まれないラベルを（ラベルの値が全ての要素で同一だとしても）取り除く。
 
-`count_values` outputs one time series per unique sample value. Each series has
-an additional label. The name of that label is given by the aggregation
-parameter, and the label value is the unique sample value.  The value of each
-time series is the number of times that sample value was present.
+`count_values`は、ユニークなサンプル値ごとに1つの時系列を出力する。
+それぞれの時系列には、ラベルが1つ追加される。
+そのラベル名は、集約するパラメーターで与えられ、ラベル値はユニークなサンプル値である。
+それぞれの時系列の値は、そのサンプル値が現れた回数である。
 
-`topk` and `bottomk` are different from other aggregators in that a subset of
-the input samples, including the original labels, are returned in the result
-vector. `by` and `without` are only used to bucket the input vector.
+`topk`と`bottomk`は、他の集約演算子と違って、入力に含まれたラベルを含んだ入力ベクトルの部分集合が結果ベクトルとして返される。
+`by`と`without`は、入力ベクトルをどうまとめるか表すためだけに利用される。
 
-Example:
+例：
 
-If the metric `http_requests_total` had time series that fan out by
-`application`, `instance`, and `group` labels, we could calculate the total
-number of seen HTTP requests per application and group over all instances via:
+メトリック`http_requests_total`がラベル`application`、`instance`、`group`の値を複数持つ時系列である場合、`application`と`group`ごとの、全ての`instances`についての合計HTTPリクエスト数を計算は、以下の式でできるだろう。
 
     sum(http_requests_total) without (instance)
 
-Which is equivalent to:
+これは、以下の式と同じことである。
  
      sum(http_requests_total) by (application, group)
 
-If we are just interested in the total of HTTP requests we have seen in **all**
-applications, we could simply write:
+**全て**の`application`の合計HTTPリクエスト数に興味があるだけなら、単に以下のように書けば良いだろう。
 
     sum(http_requests_total)
 
-To count the number of binaries running each build version we could write:
+ビルドバージョンごとのバイナリの数を数えるには、以下のように書けば良いだろう。
 
     count_values("version", build_version)
 
-To get the 5 largest HTTP requests counts across all instances we could write:
+全てのインスタンスの中でHTTPリクエスト数の大きいもの5つを得るためには、以下のように書けば良いだろう。
 
     topk(5, http_requests_total)
 
-## Binary operator precedence
+## 二項演算子の優先順位
 
-The following list shows the precedence of binary operators in Prometheus, from
-highest to lowest.
+以下のリストで二項演算子の高い方から低い方への優先順位を示す。
 
 1. `^`
 2. `*`, `/`, `%`
@@ -251,6 +209,6 @@ highest to lowest.
 5. `and`, `unless`
 6. `or`
 
-Operators on the same precedence level are left-associative. For example,
-`2 * 3 % 2` is equivalent to `(2 * 3) % 2`. However `^` is right associative,
-so `2 ^ 3 ^ 2` is equivalent to `2 ^ (3 ^ 2)`.
+同じ優先順位の演算子は、左結合である。
+例えば、`2 * 3 % 2`は、`(2 * 3) % 2`と同じである。
+ただし、`^`は、右結合なので、`2 ^ 3 ^ 2`は、`2 ^ (3 ^ 2)`と同じである。

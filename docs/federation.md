@@ -1,65 +1,41 @@
 ---
-title: Federation
+title: フェデレーション
 sort_rank: 6
 ---
 
-# Federation
+# フェデレーション
 
-Federation allows a Prometheus server to scrape selected time series from
-another Prometheus server.
+Prometheusサーバーは、フェデレーションによって、他のPrometheusサーバーから時系列データを選択的に取得することが出来る。
 
-## Use cases
+## ユースケース
 
-There are different use cases for federation. Commonly, it is used to either
-achieve scalable Prometheus monitoring setups or to pull related metrics from
-one service's Prometheus into another.
+フェデレーションには様々なユースケースがある。
+スケーラブルなPrometheusの監視の配置を達成するため、または、あるサービスのPrometheusから他のPrometheusに関連のあるメトリクスをpullするために使うのが一般的である。
 
-### Hierarchical federation
+### 階層的なフェデレーション
 
-Hierarchical federation allows Prometheus to scale to environments with tens of
-data centers and millions of nodes. In this use case, the federation topology
-resembles a tree, with higher-level Prometheus servers collecting aggregated
-time series data from a larger number of subordinated servers.
+階層的なフェデレーションによって、Prometheusは、何十のデータセンターと何百万のノードから成る環境にスケールすることが出来る。
+このユースケースでは、フェデレーションの繋ぎ方は木構造のようになる。高レベルのPrometheusサーバーほど、下位のより多くのサーバーから集約された時系列データを収集する。
 
-For example, a setup might consist of many per-datacenter Prometheus servers
-that collect data in high detail (instance-level drill-down), and a set of
-global Prometheus servers which collect and store only aggregated data
-(job-level drill-down) from those local servers. This provides an aggregate
-global view and detailed local views.
+例えば、ある配置は、インスタンスレベルの詳細なデータを集めるデータセンターごとのたくさんのPrometheusサーバーと、ジョブレベルの集約されたデータのみをそれらのPrometheusから収集・保存するグローバルなPrometheusサーバーから構成されるだろう。これによって、集約された大局的な見方も、局所的な詳細な見方も出来るようになる。
 
-### Cross-service federation
+### サービス間のフェデレーション
 
-In cross-service federation, a Prometheus server of one service is configured
-to scrape selected data from another service's Prometheus server to enable
-alerting and queries against both datasets within a single server.
+サービス間のフェデレーションでは、あるサービスのPrometheusサーバーが、他のサービスのPrometheusサーバーから選択したデータを収集するように設定され、一つのサービスの中で両方のデータに対するアラートとクエリが可能になる。
 
-For example, a cluster scheduler running multiple services might expose
-resource usage information (like memory and CPU usage) about service instances
-running on the cluster. On the other hand, a service running on that cluster
-will only expose application-specific service metrics. Often, these two sets of
-metrics are scraped by separate Prometheus servers. Using federation, the
-Prometheus server containing service-level metrics may pull in the cluster
-resource usage metrics about its specific service from the cluster Prometheus,
-so that both sets of metrics can be used within that server.
+例えば、複数のサービスを実行中のクラスタスケジューラーは、そのクラスタ内のサービスインスタンスのリソース使用量（メモリやCPU利用量）の情報をexposeしているだろう。
+他方で、そのクラスタで実行中のサービスはアプリケーション特有のサービスのメトリクスのみをexposeしているだろう。
+多くの場合、これらの二つのメトリクスは別々のPrometheusサーバーが取得している。
+フェデレーションを使うと、サービスのメトリクスを持っているPrometheusサーバーは、その特定のサービスに関するクラスタリソース使用量をクラスタのPrometheusサーバーから取得し、両方のメトリクスがそのサーバーで利用できるようになる。
 
-## Configuring federation
+## フェデレーションの設定
 
-On any given Prometheus server, the `/federate` endpoint allows retrieving the
-current value for a selected set of time series in that server. At least one
-`match[]` URL parameter must be specified to select the series to expose. Each
-`match[]` argument needs to specify an
-[instant vector selector](querying/basics.md#instant-vector-selectors) like
-`up` or `{job="api-server"}`. If multiple `match[]` parameters are provided,
-the union of all matched series is selected.
+どのPrometheusサーバでも、エンドポイント`/federate`によってそのサーバーのその時点の時系列の値を取得できる。
+時系列データを選択するためにURLパラメーターで少なくとも一つの`match[]`が指定されていなければならない。
+それぞれの`match[]`の引数は、`up`や`{job="api-server"}`のような[instance vector selector](querying/basics.md#instant-vector-selectors)を指定しなければいけない。
 
-To federate metrics from one server to another, configure your destination
-Prometheus server to scrape from the `/federate` endpoint of a source server,
-while also enabling the `honor_labels` scrape option (to not overwrite any
-labels exposed by the source server) and passing in the desired `match[]`
-parameters. For example, the following `scrape_config` federates any series
-with the label `job="prometheus"` or a metric name starting with `job:` from
-the Prometheus servers at `source-prometheus-{1,2,3}:9090` into the scraping
-Prometheus:
+あるサーバーから他のサーバーにメトリクスをfederateするためには、受け取り側のPrometheusサーバーが提供側のPrometheusサーバーのエンドポイント`/federate`をスクレイプするようにすると同時に、取得したラベルを上書きしないように`honor_labels`を有効にし、必要な`match[]`パラメーターを渡すように設定すること。
+例えば、以下の`scrape_config`は、ラベルが`job="prometheus"`またはメトリック名が`job:`で始まる時系列データを`source-prometheus-{1,2,3}:9090`から取得する。
 
 ```yaml
 - job_name: 'federate'

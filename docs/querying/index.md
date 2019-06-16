@@ -1,4 +1,4 @@
 ---
-title: Querying
+title: クエリ
 sort_rank: 4
 ---

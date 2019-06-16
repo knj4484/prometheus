@@ -1,84 +1,71 @@
 ---
-title: Installation
+title: インストール
 sort_rank: 2
 ---
 
-# Installation
+# インストール
 
-## Using pre-compiled binaries
+## コンパイル済みのバイナリの利用
 
-We provide precompiled binaries for most official Prometheus components. Check
-out the [download section](https://prometheus.io/download) for a list of all
-available versions.
+ほとんどの公式Prometheusコンポーネントに関して、コンパイル済みのバイナリが提供されている。
+全ての利用可能なバージョンのリストは、[ダウンロードページ](https://prometheus.io/download)を調べること。
 
-## From source
+## ソースから
 
-For building Prometheus components from source, see the `Makefile` targets in
-the respective repository.
+Prometheusコンポーネントをソースからビルドするには、各リポジトリの`Makefile`ターゲットを参照すること。
 
-## Using Docker
+## Dockerの利用
 
-All Prometheus services are available as Docker images on
-[Quay.io](https://quay.io/repository/prometheus/prometheus) or
-[Docker Hub](https://hub.docker.com/u/prom/).
+Prometheusサービスは全て、[Quay.io](https://quay.io/repository/prometheus/prometheus)や[Docker Hub](https://hub.docker.com/u/prom/)でDockerイメージとして利用可能である。
 
-Running Prometheus on Docker is as simple as `docker run -p 9090:9090
-prom/prometheus`. This starts Prometheus with a sample
-configuration and exposes it on port 9090.
+DockerでPrometheusを実行するには単に`docker run -p 9090:9090 prom/prometheus`を実行すれば良い。
+これで、サンプルの設定でPrometheusを起動し、ポート9090でメトリクスを出力する。
 
-The Prometheus image uses a volume to store the actual metrics. For
-production deployments it is highly recommended to use the
-[Data Volume Container](https://docs.docker.com/engine/admin/volumes/volumes/)
-pattern to ease managing the data on Prometheus upgrades.
+Prometheusイメージは、実際のメトリクスを保存するためにボリュームを利用する。
+Prometheusのアップグレード時にデータ管理を簡単にするために、本番デプロイには[Data Volume Container](https://docs.docker.com/storage/volumes/)を利用することを強く推奨する。
 
-To provide your own configuration, there are several options. Here are
-two examples.
+自分自身の設定を与えるには、いくつか選択肢がある。ここでは2つの例を示す。
 
 ### Volumes & bind-mount
 
-Bind-mount your `prometheus.yml` from the host by running:
+以下のコマンドを実行することで、そのホストから自分の`prometheus.yml`をbind-mountする。
 
 ```bash
 docker run -p 9090:9090 -v /tmp/prometheus.yml:/etc/prometheus/prometheus.yml \
        prom/prometheus
 ```
 
-Or use an additional volume for the config:
+あるいは、設定のための追加のボリュームを利用する。
 
 ```bash
 docker run -p 9090:9090 -v /prometheus-data \
        prom/prometheus --config.file=/prometheus-data/prometheus.yml
 ```
 
-### Custom image
+### 独自イメージ
 
-To avoid managing a file on the host and bind-mount it, the
-configuration can be baked into the image. This works well if the
-configuration itself is rather static and the same across all
-environments.
+ファイルを管理してそれをbind-mountするのを避けるために、設定をイメージに焼き付けることが出来る。
+これは、設定自体がかなり静的であり、全ての環境に渡って同じならば、うまく行く。
 
-For this, create a new directory with a Prometheus configuration and a
-`Dockerfile` like this:
+Prometheusの設定を含む新しいディレクトリと以下のような`Dockerfile`を作成する。
 
 ```Dockerfile
 FROM prom/prometheus
 ADD prometheus.yml /etc/prometheus/
 ```
 
-Now build and run it:
+これをビルド、実行する。
 
 ```bash
 docker build -t my-prometheus .
 docker run -p 9090:9090 my-prometheus
 ```
 
-A more advanced option is to render the configuration dynamically on start
-with some tooling or even have a daemon update it periodically.
+より高度な選択肢としては、何らかのツールで設定を起動時に動的に与えるか、デーモンで設定を定期的に更新する。
 
-## Using configuration management systems
+## 設定管理システムの利用
 
-If you prefer using configuration management systems you might be interested in
-the following third-party contributions:
+設定管理システムが好ましいのであれば、以下のサードパーティからの貢献に興味が湧くだろう。
 
 ### Ansible
 

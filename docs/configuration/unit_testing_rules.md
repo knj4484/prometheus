@@ -1,37 +1,37 @@
 ---
-title: Unit Testing for Rules
+title: ルールの単体テスト
 sort_rank: 6
 ---
 
-# Unit Testing for Rules
+# ルールの単体テスト
 
-You can use `promtool` to test your rules.
+ルールをテストするために`promtool`を使うことができる。
 
 ```shell
-# For a single test file.
+# 1つのファイルをテストする
 ./promtool test rules test.yml
 
-# If you have multiple test files, say test1.yml,test2.yml,test2.yml
+# 複数のファイル、例えばtest1.yml、test2.yml、test2.ymlがある場合
 ./promtool test rules test1.yml test2.yml test3.yml
 ```
 
-## Test file format
+## テストファイルのフォーマット
 
 ```yaml
-# This is a list of rule files to consider for testing.
+# テスト対象として扱うルールファイルのリスト
 rule_files:
   [ - <file_name> ]
 
-# optional, default = 1m
+# オプション。デフォルトは1m
 evaluation_interval: <duration>
 
-# The order in which group names are listed below will be the order of evaluation of 
-# rule groups (at a given evaluation time). The order is guaranteed only for the groups mentioned below. 
-# All the groups need not be mentioned below.
+# 以下でグループ名がリストされている順番が（ある時点で）ルールグループが評価される順番となる。
+# 以下で記載されているグループのみ順番が保証される。
+# 全てのグループが以下に記載されている必要はない。
 group_eval_order:
   [ - <group_name> ]
 
-# All the tests are listed here.
+# 全てのテストがここでリストされる
 tests:
   [ - <test_group> ]
 ```
@@ -39,18 +39,18 @@ tests:
 ### `<test_group>`
 
 ``` yaml
-# Series data
+# 時系列データ
 interval: <duration>
 input_series:
   [ - <series> ]
 
-# Unit tests for the above data.
+# 上記データを対象とした単体テスト
 
-# Unit tests for alerting rules. We consider the alerting rules from the input file.
+# アラートルールに対する単体テスト。入力ファイルからのアラートルールをテストする
 alert_rule_test:
   [ - <alert_test_case> ]
 
-# Unit tests PromQL expressions.
+# PromQLの式に対する単体テスト
 promql_expr_test:
   [ - <promql_test_case> ]
 ```
@@ -58,36 +58,36 @@ promql_expr_test:
 ### `<series>`
 
 ```yaml
-# This follows the usual series notation '<metric name>{<label name>=<label value>, ...}'
-# Examples: 
+# 通常の時系列の記法 <metric name>{<label name>=<label value>, ...} に従う
+# 例: 
 #      series_name{label1="value1", label2="value2"}
 #      go_goroutines{job="prometheus", instance="localhost:9090"}
 series: <string>
 
-# This uses expanding notation.
+# 展開される記法を使う
 # Expanding notation: 
-#     'a+bxc' becomes 'a a+b a+(2*b) a+(3*b) … a+(c*b)'
-#     'a-bxc' becomes 'a a-b a-(2*b) a-(3*b) … a-(c*b)'
-# Examples:
-#     1. '-2+4x3' becomes '-2 2 6 10'
-#     2. ' 1-2x4' becomes '1 -1 -3 -5 -7'
+#     'a+bxc' は 'a a+b a+(2*b) a+(3*b) … a+(c*b)' になる
+#     'a-bxc' は 'a a-b a-(2*b) a-(3*b) … a-(c*b)' になる
+# 例:
+#     1. '-2+4x3' は '-2 2 6 10' になる
+#     2. ' 1-2x4' は '1 -1 -3 -5 -7' になる
 values: <string>
 ```
 
 ### `<alert_test_case>`
 
-Prometheus allows you to have same alertname for different alerting rules. Hence in this unit testing, you have to list the union of all the firing alerts for the alertname under a single `<alert_test_case>`.
+Prometheusでは、異なるアラートルールに同じアラート名をつけることができる。
+したがって、この単体テストでは、起きている全てのアラートの和集合を1つの`<alert_test_case>`の中でリストしなければならない。
 
 ``` yaml
-# It's the time elapsed from time=0s when the alerts have to be checked.
+# アラートがチェックされるべき time=0s からの経過時間
 eval_time: <duration>
 
-# Name of the alert to be tested.
+# テスト対象のアラート名
 alertname: <string>
 
-# List of expected alerts which are firing under the given alertname at 
-# given evaluation time. If you want to test if an alerting rule should 
-# not be firing, then you can mention the above fields and leave 'exp_alerts' empty.
+# 与えられた評価時間に与えられたアラート名で起きていると想定しているアラートのリスト。
+# アラートが起きているべきではないというテストをしたい場合は、上記フィールドを指定してexp_alertsを空にしておけば良い
 exp_alerts:
   [ - <alert> ]
 ```
@@ -95,9 +95,8 @@ exp_alerts:
 ### `<alert>`
 
 ``` yaml
-# These are the expanded labels and annotations of the expected alert. 
-# Note: labels also include the labels of the sample associated with the 
-# alert (same as what you see in `/alerts`, without series `__name__` and `alertname`)
+# これらは想定されるアラートの展開されたラベルとアノテーションである。
+# ラベルは、アラートに付随するサンプルのラベルも含む（`/alerts`で見られるものと同じ。ただし`__name__`と`alertname`は除く）。
 exp_labels:
   [ <labelname>: <string> ]
 exp_annotations:
@@ -107,13 +106,13 @@ exp_annotations:
 ### `<promql_test_case>`
 
 ```yaml
-# Expression to evaluate
+# 評価する式
 expr: <string>
 
-# It's the time elapsed from time=0s when the alerts have to be checked.
+# time=0s からの経過時間
 eval_time: <duration>
 
-# Expected samples at the given evaluation time.
+# 与えられた評価時間で想定されるサンプル
 exp_samples:
   [ - <sample> ]
 ```
@@ -121,27 +120,28 @@ exp_samples:
 ### `<sample>`
 
 ```yaml
-# Labels of the sample in usual series notation '<metric name>{<label name>=<label value>, ...}'
-# Examples: 
+# 通常の時系列の記法 <metric name>{<label name>=<label value>, ...} でのサンプルのラベル
+# 例: 
 #      series_name{label1="value1", label2="value2"}
 #      go_goroutines{job="prometheus", instance="localhost:9090"}
 labels: <string>
 
-# The expected value of the promql expression.
+# PromQLの式の想定される値
 value: <number>
 ```
 
-## Example 
+## 例
 
-This is an example input file for unit testing which passes the test. `test.yml` is the test file which follows the syntax above and `alerts.yml` contains the alerting rules.
+これは、単体テストの入力ファイルのサンプルで、テストにパスする。
+`test.yml`は上記の構文に従ったテストファイルで、`alerts.yml`はアラートルールを含んでいる。
 
-With `alerts.yml` in the same directory, run `./promtool test rules test.yml`.
+`alerts.yml`が同じディレクトリにあるとして、`./promtool test rules test.yml`を実行する。
 
 ### `test.yml`
 
 ```yaml
-# This is the main input for unit testing. 
-# Only this file is passed as command line argument.
+# これが、単体テストのメインの入力である。
+# このファイルのみがコマンドライン引数として渡される。
 
 rule_files:
     - alerts.yml
@@ -162,7 +162,7 @@ tests:
           - series: 'go_goroutines{job="node_exporter", instance="localhost:9100"}'
             values: '10+10x7 10+30x4' # 10 20 30 40 50 60 70 80 10 40 70 100 130
 
-      # Unit test for alerting rules.
+      # アラートルールの単体テスト
       alert_rule_test:
           # Unit test 1.
           - eval_time: 10m
@@ -176,7 +176,7 @@ tests:
                   exp_annotations:
                       summary: "Instance localhost:9090 down"
                       description: "localhost:9090 of job prometheus has been down for more than 5 minutes."
-      # Unit tests for promql expressions.
+      # PromQLの式の単体テスト
       promql_expr_test:
           # Unit test 1.
           - expr: go_goroutines > 5
@@ -193,7 +193,7 @@ tests:
 ### `alerts.yml`
 
 ```yaml
-# This is the rules file.
+# これはルールファイルである
 
 groups:
 - name: example

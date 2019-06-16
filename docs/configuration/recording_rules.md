@@ -1,60 +1,49 @@
 ---
-title: Recording rules
+title: レコーディングルール
 sort_rank: 2
 ---
 
-# Defining recording rules
+# レコーディングルール定義
 
-## Configuring rules
+## ルール設定
 
-Prometheus supports two types of rules which may be configured and then
-evaluated at regular intervals: recording rules and [alerting
-rules](alerting_rules.md). To include rules in Prometheus, create a file
-containing the necessary rule statements and have Prometheus load the file via
-the `rule_files` field in the [Prometheus configuration](configuration.md).
-Rule files use YAML.
+Prometheusは、2種類のルール（レコーディングルールと[アラートルール](alerting_rules.md)）をサポートしており、それらは一定の時間間隔で評価される。
+Prometheusにルールを取り込むには、必要なルールを含んだファイルを作成し、[Prometheusの設定項目](configuration.md)`rule_files`を通してファイルを読み込ませる。
+ルールのファイルにはYAMLを利用する。
 
-The rule files can be reloaded at runtime by sending `SIGHUP` to the Prometheus
-process. The changes are only applied if all rule files are well-formatted.
+ルールファイルは、Prometheusプロセスに`SIGHUP`を送ることで、実行時に再読み込みが出来る。
+全てのルールファイルが正しくフォーマットされている場合にのみ、変更が適用される。
 
-## Syntax-checking rules
+## ルールの構文チェック
 
-To quickly check whether a rule file is syntactically correct without starting
-a Prometheus server, install and run Prometheus's `promtool` command-line
-utility tool:
+ルールファイルが構文的に正しいかを、Prometheusサーバーを起動せずにさっと確認するには、Prometheusのコマンドラインユーティリティ`promtool`をインストール、実行する。
 
 ```bash
 go get github.com/prometheus/prometheus/cmd/promtool
 promtool check rules /path/to/example.rules.yml
 ```
 
-When the file is syntactically valid, the checker prints a textual
-representation of the parsed rules to standard output and then exits with
-a `0` return status.
+ファイルが構文的に正しい時には、チェッカーは、パースしたルールをテキストとして標準出力に出力し、リターンコード`0`で終了する。
 
-If there are any syntax errors or invalid input arguments, it prints an error 
-message to standard error and exits with a `1` return status.
+何かしら構文エラーがあるか、入力引数が不正な場合は、標準エラーにエラーメッセージを出力し、リターンコード`1`で終了する。
 
-## Recording rules
+## レコーディングルール
 
-Recording rules allow you to precompute frequently needed or computationally
-expensive expressions and save their result as a new set of time series.
-Querying the precomputed result will then often be much faster than executing
-the original expression every time it is needed. This is especially useful for
-dashboards, which need to query the same expression repeatedly every time they
-refresh.
+レコーディングルールによって、頻繁に必要であったり計算量の多い式を事前に計算し、新しい時系列として結果を保存することが出来る。
+事前に計算された結果に対するクエリは、元の式を必要な時に毎回実行するよりも格段に早いことがよくある。
+これは、リフレッシュするたびに繰り返し同じ式をクエリする必要があるダッシュボードのために特に有益である。
 
-Recording and alerting rules exist in a rule group. Rules within a group are
-run sequentially at a regular interval.
+recording ruleとalerting ruleは、一つのルールグループに紐づけられる。
+あるグループ内の複数のルールは、一定の時間間隔で逐次的に実行される。
 
-The syntax of a rule file is:
+ルールファイルの構文は以下の通り。
 
 ```yaml
 groups:
   [ - <rule_group> ]
 ```
 
-A simple example rules file would be:
+ルールファイルの簡単な例は次のようになるだろう。
 
 ```yaml
 groups:
@@ -66,10 +55,10 @@ groups:
 
 ### `<rule_group>`
 ```
-# The name of the group. Must be unique within a file.
+# グループの名前。ファイルの中でユニークでなければならない。
 name: <string>
 
-# How often rules in the group are evaluated.
+# グループ内のルールがどれぐらい頻繁に評価されるか
 [ interval: <duration> | default = global.evaluation_interval ]
 
 rules:
@@ -78,43 +67,40 @@ rules:
 
 ### `<rule>`
 
-The syntax for recording rules is:
+レコーディングルールの構文は以下の通り。
 
 ```
-# The name of the time series to output to. Must be a valid metric name.
+# 出力する時系列の名前。正当なメトリック名でなければならない
 record: <string>
 
-# The PromQL expression to evaluate. Every evaluation cycle this is
-# evaluated at the current time, and the result recorded as a new set of
-# time series with the metric name as given by 'record'.
+# 評価するPromQLの式。評価の各サイクルの時点でこの式が評価され、recordで指定されたメトリック名で
+# 新しい時系列の集合として結果が記録される。
 expr: <string>
 
-# Labels to add or overwrite before storing the result.
+# 結果を記録する前に追加または上書きされるラベル
 labels:
   [ <labelname>: <labelvalue> ]
 ```
 
-The syntax for alerting rules is:
+アラートルールの構文は以下の通り。
 
 ```
-# The name of the alert. Must be a valid metric name.
+# アラート名。正当なメトリック名でなければならない
 alert: <string>
 
-# The PromQL expression to evaluate. Every evaluation cycle this is
-# evaluated at the current time, and all resultant time series become
-# pending/firing alerts.
+# 評価するPromQLの式。評価の各サイクルの時点でこの式が評価され、全ての結果の時系列が
+# pending/firingされたアラートになる
 expr: <string>
 
-# Alerts are considered firing once they have been returned for this long.
-# Alerts which have not yet fired for long enough are considered pending.
+# この長さに渡ってアラートが返されると、firingとみなされる。
+# この長さまで起き続けていないアラートは、pendingとみなされる。
 [ for: <duration> | default = 0s ]
 
-# Labels to add or overwrite for each alert.
+# 各アラートに対して追加または上書きされるラベル
 labels:
   [ <labelname>: <tmpl_string> ]
 
-# Annotations to add to each alert.
+# 各アラートに追加されるアノテーション
 annotations:
   [ <labelname>: <tmpl_string> ]
 ```
-
