@@ -1,58 +1,87 @@
-# Internal architecture
+# 内部構造
 
-The Prometheus server consists of many internal components that work together in concert to achieve Prometheus's overall functionality. This document provides an overview of the major components, including how they fit together and pointers to implementation details. If you are a developer who is new to Prometheus and wants to get an overview of all its pieces, start here.
+Prometheusサーバーは、Prometheus全体の機能を生み出すために協調して一緒に働く多くの内部コンポーネントから成る。
+このドキュメントは、それらがどのように組み合わさっているかを含む主要なコンポーネントの概要およびその実装の詳細へのリンクを示す。
+もしPrometheusの新米開発者でPrometheusの各部分の概要を知りたいのなら、ここからはじめよう。
 
-The overall Prometheus server architecture is shown in this diagram:
+このダイアグラムで、Prometheusサーバー全体の構成が示されている。
 
 ![Prometheus server architecture](images/internal_architecture.svg)
 
-**NOTE**: Arrows indicate request or connection initiation direction, not necessarily dataflow direction.
+**注**: 矢印は、リクエストやコネクションを開始する方向を示し、必ずしもデータの流れの方向ではない。
 
-The sections below will explain each component in the diagram. Code links and explanations are based on Prometheus version 2.3.1. Future Prometheus versions may differ.
+以下のセクションで、図中の各コンポーネントについて説明する。
+コードへのリンクや説明は、Prometheus 2.3.1に基づいている。
+Prometheusの将来のバージョンでは異なる可能性がある。
 
-## Main function
+## main関数
 
-The [`main()` function](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L77-L600) initializes and runs all other Prometheus server components. It also connects interdependent components to each other.
+[`main()` function](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L77-L600)は、Prometheusサーバーの他の全てのコンポーネントを初期化し稼働させる。
+また、依存関係のあるコンポーネント同士を繋げる。
 
-As a first step, `main()` defines and parses the server's command-line flags into a [local configuration structure](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L83-L100), while performing extra sanitization and initialization for some values. Note that this flag-based configuration structure is independent of the configuration that is later read from a configuration file (as provided by the `--config.file` flag). Prometheus distinguishes between flag-based configuration and file-based configuration: flags are used for simple settings that do not support being updated without a server restart, while any settings provided in the configuration file have to support being reloaded without restarting the entire server.
+第一歩として、`main()`は、サーバーのコマンドラインフラグを定義し、解析して[ローカルの設定の構造体](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L83-L100)に変換する。
+同時に、サニタイズやいくつかの値の初期化を行う。
+フラグに基づくこの設定の構造体は、あとで（`--config.file`フラグで指定された）設定ファイルから読み込まれる設定からは独立していることに注意すること。
+Prometheusは、フラグに基づく設定とファイルに基づく設定を区別する。フラグは、サーバーの再起動なしに更新することができない単純な設定利用され流のに対し、設定ファイルで提供されている設定項目は、サーバーを再起動せずに再読み込みできなければならない。
 
-Next, `main()` instantiates all the major run-time components of Prometheus and connects them together using channels, references, or passing in contexts for later coordination and cancellation. These components include service discovery, target scraping, storage, and more (as laid out in the rest of this document).
+次に、`main()`は、Prometheusの実行時のコンポーネントを初期化し、channelや参照、後の協調動作やキャンセル処理のためのcontextの受け渡しを利用してそれらを接続する。
+これらのコンポーネントには、（このドキュメントの残りで説明されているように）サービスディスカバリー、監視対象のスクレイプ、ストレージなどが含まれる。
 
-Finally, the server [runs all components](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L366-L598) in an [actor-like model](https://www.brianstorti.com/the-actor-model/), using [`github.com/oklog/oklog/pkg/group`](https://godoc.org/github.com/oklog/run) to coordinate the startup and shutdown of all interconnected actors. Multiple channels are used to enforce ordering constraints, such as not enabling the web interface before the storage is ready and the initial configuration file load has happened.
+最後にPrometheusサーバーは、起動とシャットダウンを調整するために[`github.com/oklog/oklog/pkg/group`](https://godoc.org/github.com/oklog/run)を利用して、[actorモデル](https://www.brianstorti.com/the-actor-model/)のように[全てのコンポーネントを実行](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L366-L598)する。
+順序の制約を為に強制する（ストレージの準備が出来て最初の設定ファイル読み込みが起きるまではwebインターフェースを有効にしないなど）ために、複数のチャネルが利用される。
 
-## Configuration
+## 設定
 
-The configuration subsystem is responsible for reading, validating, and applying the settings provided in the YAML-based configuration file as specified by the `--config.file` flag. [See the documentation](https://prometheus.io/docs/prometheus/latest/configuration/configuration/) for a description of all configuration settings. Prometheus has functionality for reading and applying a configuration file, and it has a goroutine that watches for requests to reload the configuration from the same file. Both mechanisms are outlined below.
+設定のサブシステムは、`--config.file`フラグで指定されたYAMLの設定ファイルで与えられる設定の読み込み、検証、適用を受け持つ。
+全ての設定項目の説明は[ドキュメント](https://prometheus.io/docs/prometheus/latest/configuration/configuration/)を参照すること。
+Prometheusには、設定ファイルの読み込みと適用のための機能があり、同じファイルからの設定の再読み込みのリクエストを待ち受けているgoroutineがある。
+どちらの仕組みもこの後で説明されている。
 
-### Configuration reading and parsing
+### 設定の読み込みと解析
 
-When the initial configuration is loaded or a subsequent reload happens, Prometheus calls the [`config.LoadFile()`](https://github.com/prometheus/prometheus/blob/v2.3.1/config/config.go#L52-L64) function to read its configuration from a file and parse it into the [`config.Config` structure](https://github.com/prometheus/prometheus/blob/v2.3.1/config/config.go#L133-L145). This structure represents the overall configuration of the server and all of its components. It contains sub-structures that mirror the hierarchy of the configuration file. Each struct has a [default configuration](https://github.com/prometheus/prometheus/blob/v2.3.1/config/config.go#L66-L131) as well as an `UnmarshalYAML()` method which parses the struct from YAML and may apply further validity checks or initializations. Once the configuration has been fully parsed and validated, the resulting configuration structure is returned.
+最初の設定が読み込まれたまたはそれ以降の再読み込みが起きた時に、Prometheusは、[`config.LoadFile()`](https://github.com/prometheus/prometheus/blob/v2.3.1/config/config.go#L52-L64)を呼び出し、設定をファイルから読み込み、解析して[`config.Config` structure](https://github.com/prometheus/prometheus/blob/v2.3.1/config/config.go#L133-L145)に変換する。
+この構造体は、サーバーとその全てのコンポーネントの設定全体を表す。
+これは、設定ファイルの階層構造を反映した下層構造を含んでいる。
+各構造体には、[デフォルトの設定](https://github.com/prometheus/prometheus/blob/v2.3.1/config/config.go#L66-L131)およびYAMLから構造体へと変換しさらに有効性を検査したり初期化する`UnmarshalYAML()`メソッドがある。
+設定が完全に解析されて検証が終わると、その結果の設定の構造体が返される。
 
-### Reload handler
 
-The [configuration reload handler](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L443-L478) is a goroutine that is implemented directly in `main()` and listens for configuration reload requests from either the web interface or a [`HUP` signal](https://en.wikipedia.org/wiki/Signal_(IPC)#SIGHUP). When it receives a reload request, it re-reads the configuration file from disk using `config.LoadFile()` as described above and applies the resulting `config.Config` structure to all components that support reloading by either [calling their `ApplyConfig()` method or by calling a custom reload function](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L302-L341).
+### 再読み込みハンドラー
 
-## Termination handler
+設定再読み込みハンドラーは、`main()`の中で直接実装されているgoroutineであり、webインターフェースまたは[シグナル`HUP`](https://ja.wikipedia.org/wiki/シグナル (Unix))からの設定再読み込みリクエストを待ち受けている。
+再読み込みリクエストを受け取ると、`config.LoadFile()`を使って上述のように設定ファイルをディスクから読み直し、再読み込みをサポートしている全てのコンポーネントに、[`ApplyConfig()`メソッドを呼び出すか、独自の再読み込み関数を呼び出して](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L302-L341)、その結果の構造体`config.Config`を適用する。
 
-The [termination handler](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L367-L392) is a goroutine that is implemented directly in `main()` and listens for termination requests from either the web interface or a [`TERM` signal](https://en.wikipedia.org/wiki/Signal_(IPC)#SIGTERM). When it receives a termination request, it returns and thus triggers the orderly shutdown of all other Prometheus components via the actor coordination functionality provided by [`github.com/oklog/oklog/pkg/group`](https://godoc.org/github.com/oklog/run).
+## 終了ハンドラー
+
+[終了ハンドラー](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L367-L392)は、`main()`の中で直接実装されているgoroutineであり、webインターフェースまたは[シグナル`TERM`](https://ja.wikipedia.org/wiki/シグナル (Unix))からの終了リクエストを待ち受けている。
+終了リクエストを受け取ると、リターンして、[`github.com/oklog/oklog/pkg/group`](https://godoc.org/github.com/oklog/run)で提供されているactor coordinationの機能を通じて、他のPrometheusコンポーネント全てを綺麗に終了させる。
 
 ## Scrape discovery manager
 
-The scrape discovery manager is a [`discovery.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/manager.go#L73-L89) that uses Prometheus's service discovery functionality to find and continuously update the list of targets from which Prometheus should scrape metrics. It runs independently of the scrape manager (which performs the actual target scrapes) and feeds it with a stream of [target group](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/targetgroup/targetgroup.go#L24-L33) updates over a [synchronization channel](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L431).
+scrape discovery managerは、[`discovery.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/manager.go#L73-L89)であり、Prometheusのサービスディスカバリー機能を利用して、Prometheusのメトリクス取得元である対象のリストを継続的に更新する。
+監視対象を実際にスクレイプをするscrape managerからは独立しで動作し、[synchronization channel](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L431)を通して[target group](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/targetgroup/targetgroup.go#L24-L33)の更新を流す。
 
-Internally, the scrape discovery manager runs an instance of each configuration-defined service discovery mechanism in its own goroutine. For example, if a `scrape_config` in the configuration file defines two [`kubernetes_sd_config` sections](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Ckubernetes_sd_config%3E), the manager will run two separate [`kubernetes.Discovery`](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/kubernetes/kubernetes.go#L150-L159) instances. Each of these discovery instances implements the [`discovery.Discoverer` interface](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/manager.go#L41-L55) and sends target updates over a synchronization channel to the controlling discovery manager, which then enriches the target group update with information about the specific discovery instance and forwards it to the scrape manager.
+内部的には、scrape discovery managerは、設定で定義されたサービスディスカバリーの仕組みのインスタンスをそれ自体のgoroutineで動作させる。
+例えば、設定ファイルの`scrape_config`が2つの[`kubernetes_sd_config`セクション](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Ckubernetes_sd_config%3E)を定義しているとすると、scrape discovery managerは2つの別々の[`kubernetes.Discovery`](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/kubernetes/kubernetes.go#L150-L159)のインスタンスを動作させる。
+これらの`kubernetes.Discovery`はそれぞれ、インターフェース[`discovery.Discoverer`](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/manager.go#L41-L55)を実装しており、synchronization channelを通して監視対象の更新をdiscovery managerに送信する。
+そうすると、discovery managerは、特定のディスカバリーのインスタンスについての情報でターゲットグループを拡充し、それをscrape managerに転送する。
 
-When a configuration change is applied, the discovery manager stops all currently running discovery mechanisms and restarts new ones as defined in the new configuration file.
+設定の変更が適用されると、discovery managerは、動作中のディスカバリーの仕組みを全て停止し、新しい設定ファイルで定義されたものとして再起動する。
 
-For more details, see the more extensive [documentation about service discovery internals](https://github.com/prometheus/prometheus/blob/master/discovery/README.md).
+さらなる詳細については、広範な[サービスディスカバリーの内部についてのドキュメント](https://github.com/prometheus/prometheus/blob/master/discovery/README.md)を参照すること。
 
 ## Scrape manager
 
-The scrape manager is a [`scrape.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/scrape/manager.go#L47-L62) that is responsible for scraping metrics from discovered monitoring targets and forwarding the resulting samples to the storage subsystem.
+scrape managerは、[`scrape.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/scrape/manager.go#L47-L62)であり、検出された監視対象からメトリクスを取得し、得られたサンプルをストレージのサブシステムに転送する。
 
-### Target updates and overall architecture
+### ターゲット更新と全体の構造
 
-In the same way that the scrape discovery manager runs one discovery mechanism for each `scrape_config`, the scrape manager runs a corresponding scrape pool for each such section. Both identify these sections (e.g. across reloads and across the two components) via the section's `job_name` field, which has to be unique in a given configuration file. The discovery manager sends target updates for each `scrape_config` over a synchronization channel to the scrape manager, [which then applies those updates to the corresponding scrape pools](https://github.com/prometheus/prometheus/blob/v2.3.1/scrape/manager.go#L150-L173). Each scrape pool in turn runs one scrape loop for each target. The overall hierarchy looks like this:
+scrape discovery managerが、`scrape_config`それぞれに対して1つのディスカバリーの仕組みを動作させるのと同様の方法で、scrape managerは`scrape_config`それぞれに対して対応するスクレイプのプールを動作させる。
+両者は、複数のリロードとこの2つのコンポーネントにまたがっている`scrape_config`を、設定項目`job_name`を通して特定する（`job_name`は1つの設定ファイルの中でユニークでなければならない）。
+discovery managerは、`scrape_config`それぞれに対する監視対象の更新をsynchronization channelを通してscrape managerに送信する。
+scrape managerは、[それらの更新を対応するscrape poolに適用する](https://github.com/prometheus/prometheus/blob/v2.3.1/scrape/manager.go#L150-L173)。
+各scrape poolは、監視対象それぞれのスクレイプのループを実行する。
+全体の階層構造は以下のようになる。
 
 * Scrape manager
   * Scrape pool for `scrape_config` 1
@@ -69,69 +98,96 @@ In the same way that the scrape discovery manager runs one discovery mechanism f
   * Scrape pool for `scrape_config` n
     * [...]
 
-### Target labels and target relabeling
+### ターゲットのラベルとリラベル
 
-Whenever the scrape manager receives an updated list of targets for a given scrape pool from the discovery manager, the scrape pool applies default target labels (such as `job` and `instance`) to each target and applies [target relabeling configurations](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Crelabel_config%3E) to produce the final list of targets to be scraped.
+scrape managerが、あるスクレイプのプールに対する更新された監視対象のリストをdiscovery managerから受け取ると、そのスクレイプのプールは、デフォルトのターゲットラベル（`job`、`instance`など）を各ターゲットに適用し、最終的にスクレイプすべき監視対象のリストを生成するために[リラベルの設定](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Crelabel_config%3E)を適用する。
 
-### Target hashing and scrape timing
+### ターゲットのハッシュとスクレイプのタイミング
 
 To spread out scrapes within a scrape pool and in a consistently slotted way across the `scrape_config`'s scrape interval, each target is [hashed by its label set and its final scrape URL](https://github.com/prometheus/prometheus/blob/v2.3.1/scrape/target.go#L75-L82). This hash is then used to [choose a deterministic offset](https://github.com/prometheus/prometheus/blob/v2.3.1/scrape/target.go#L84-L98) within that interval.
+スクレイプのプール内にスクレイプを拡散し、
+`scrape_config`のスクレイプ間隔に絶えず
+各監視対象は、[ラベル集合と最終的なスクレイプURLでハッシュが取られる](https://github.com/prometheus/prometheus/blob/v2.3.1/scrape/target.go#L75-L82)。
+このハッシュは、スクレイプ間隔内の[オフセットを選ぶ](https://github.com/prometheus/prometheus/blob/v2.3.1/scrape/target.go#L84-L98)ために利用される。
 
-### Target scrapes
+### 監視対象のスクレイプ
 
-Finally, a scrape loop periodically scrapes its targets over HTTP and tries to decode the received HTTP responses according to the [Prometheus text-based metrics exposition format](https://prometheus.io/docs/instrumenting/exposition_formats/). It then applies [metric relabeling configurations](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Cmetric_relabel_configs%3E) to each individual sample and sends the resulting samples to the storage subsystem. Additionally, it tracks and stores the staleness of time series over multiple scrape runs, records [scrape health information](https://prometheus.io/docs/concepts/jobs_instances/#automatically-generated-labels-and-time-series) (such as the `up` and `scrape_duration_seconds` metrics), and performs other housekeeping tasks to optimize the appending of time series to the storage engine. Note that a scrape is not allowed to take longer than the configured scrape interval, and the configurable scrape timeout is capped to that. This ensures that one scrape is terminated before another one begins.
+最後に、スクレイプのループは、定期的に、HTTPで監視対象をスクレイプし、受信したHTTPレスポンスを[Prometheusのテキストベースのメトリクス出力フォーマット](https://prometheus.io/docs/instrumenting/exposition_formats/)に従ってデコードする。
+個々のサンプルそれぞれに[メトリックのリラベル設定](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Cmetric_relabel_configs%3E)を適用し、その結果のサンプルをストレージのサブシステムに送信する。
+さらに、複数のスクレイプの実行にまたがる時系列の失効を追跡し保存し、[スクレイプの状態の情報](https://prometheus.io/docs/concepts/jobs_instances/#automatically-generated-labels-and-time-series)（`up`や`scrape_duration_seconds`などのメトリクス）を記録し、ストレージエンジンへの時系列の追加を最適化するためのデータの整理を行う。
+1回のスクレイプは、設定されたスクレイプ間隔より時間がかかってはいけないし、スクレイプのタイムアウトはそれが上限になっていることに注意。
+これによって、1回のスクレイプが別のスクレイプが始まる前に終わらされるのが確実になる。
 
-## Storage
+## ストレージ
 
-Prometheus stores time series samples in a local time series database (TSDB) and optionally also forwards a copy of all samples to a set of configurable remote endpoints. Similarly, Prometheus reads data from the local TSDB and optionally also from remote endpoints. Both local and remote storage subsystems are explained below.
+Prometheusは、時系列のサンプルをローカルの時系列データベース（TSDB）に保存し、オプションで、全サンプルのコピーを設定されたリモートのエンドポイントに転送する。
+同様に、Prometheusは、ローカルのTSDBおよびオプションでリモートのエンドポイントからデータを読み取る。
+ローカルとリモートのストレージのサブシステムについて以下で説明する。
 
-### Fanout storage
+### fanoutストレージ
 
-The [fanout storage](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/fanout.go#L27-L32) is a [`storage.Storage`](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/interface.go#L31-L44) implementation that proxies and abstracts away the details of the underlying local and remote storage subsystems for use by other components. For reads, it merges query results from local and remote sources, while writes are duplicated to all local and remote destinations. Internally, the fanout storage differentiates between a primary (local) storage and optional secondary (remote) storages, as they have different capabilities for optimized series ingestion.
+[fanout storage](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/fanout.go#L27-L32)は、他のコンポーネントによる利用のために、背後にあるローカルおよびリモートのストレージの詳細をプロキシ、抽象化する[`storage.Storage`](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/interface.go#L31-L44)の実装である。
+読み込みのためにローカルとリモートの読み込み元からのクエリの結果をマージし、書き込みはローカルとリモートの全ての書き込み先に複製される。
+時系列の取り込みを最適化するための機能は様々なので、内部的には、第1の（ローカルの）ストレージとオプションの第2の（リモートの）ストレージを区別する。
 
-Currently rules still read and write directly from/to the fanout storage, but this will be changed soon so that rules will only read local data by default. This is to increase the reliability of alerting and recording rules, which should only need short-term data in most cases.
+現在、ルールはまだ、直接、fanout storageから読み込み、fanout storageへ書き込みをしているが、しばらくすると、デフォルトでルールがローカルデータを読みこむだけになるように変更されるだろう。
+これで、ほとんどの場合で短期のデータしか必要のないアラートとレコーディングルールの信頼性が増す。
 
-### Local storage
+### ローカルストレージ
 
-Prometheus's local on-disk time series database is a [light-weight wrapper](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/tsdb/tsdb.go#L102-L106) around [`github.com/prometheus/tsdb.DB`](https://github.com/prometheus/tsdb/blob/master/db.go#L92-L117). The wrapper makes only minor interface adjustments for use of the TSDB in the context of the Prometheus server and implements the [`storage.Storage` interface](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/interface.go#L31-L44). You can find more details about the TSDB's on-disk layout in the [local storage documentation](https://prometheus.io/docs/prometheus/latest/storage/).
+Prometheusのローカルディクス上の時系列データベースは、[`github.com/prometheus/tsdb.DB`](https://github.com/prometheus/tsdb/blob/master/db.go#L92-L117)に対する[軽量ラッパー](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/tsdb/tsdb.go#L102-L106)である。
+このラッパーは、Prometheusサーバー環境でTSDBを利用するための若干のインターフェースの調整だけをし、[`storage.Storage`インターフェース](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/interface.go#L31-L44)を実装する。
+[ローカルストレージのドキュメント](https://prometheus.io/docs/prometheus/latest/storage/)にTSDBのディスク上のレイアウトさらなる詳細がある。
 
-### Remote storage
+### リモートストレージ
 
-The remote storage is a [`remote.Storage`](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/remote/storage.go#L31-L44) that implements the [`storage.Storage` interface](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/interface.go#L31-L44) and is responsible for interfacing with remote read and write endpoints.
+リモートストレージは、[`remote.Storage`](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/remote/storage.go#L31-L44)であり、[`storage.Storage`インターフェース](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/interface.go#L31-L44)を実装し、リモートの読み込みと書き込みのエンドポイントとの連結を担っている。
 
-For each [`remote_write`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Cremote_write%3E) section in the configuration file, the remote storage creates and runs one [`remote.QueueManager`](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/remote/queue_manager.go#L141-L161), which in turn queues and sends samples to a specific remote write endpoint. Each queue manager parallelizes writes to the remote endpoint by running a dynamic number of shards based on current and past load observations. When a configuration reload is applied, all remote storage queues are shut down and new ones are created.
+設定ファイルの[`remote_write`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Cremote_write%3E)それぞれに対して、remote storageは1つの[`remote.QueueManager`](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/remote/queue_manager.go#L141-L161)を作成し、動作させる。
+次に、`remote.QueueManager`は、サンプルをキューに入れ、リモートの書き込みエンドポイントに送信する。
+各キューマネージャーは、現在と過去の負荷の観察に基づいて動的に決まる数のシャードを動作させることで、リモートエンドポイントへの書き込みを並列化する。
+設定の再読み込みが適用されると、全てのリモートストレージのキューはシャットダウンされ、新しいキューが作成される。
 
-For each [`remote_read`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Cremote_read%3E) section in the configuration file, the remote storage creates a [reader client](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/remote/storage.go#L96-L118) and results from each remote source are merged.
+設定ファイルの[`remote_read`](https://prometheus.io/docs/prometheus/latest/configuration/configuration/#%3Cremote_read%3E)それぞれに対して、remote storageは1つの[reader client](https://github.com/prometheus/prometheus/blob/v2.3.1/storage/remote/storage.go#L96-L118)を作成し、各リモートソースからの結果はマージされる。
 
-## PromQL engine
+## PromQLエンジン
 
-The [PromQL engine](https://github.com/prometheus/prometheus/blob/v2.3.1/promql/engine.go#L164-L171) is responsible for evaluating [PromQL expression queries](https://prometheus.io/docs/prometheus/latest/querying/basics/) against Prometheus's time series database. The engine does not run as its own actor goroutine, but is used as a library from the web interface and the rule manager. PromQL evaluation happens in multiple phases: when a query is created, its expression is parsed into an abstract syntax tree and results in an executable query. The subsequent execution phase first looks up and creates iterators for the necessary time series from the underlying storage. It then evaluates the PromQL expression on the iterators. Actual time series bulk data retrieval happens lazily during evaluation (at least in the case of the local TSDB). Expression evaluation returns a PromQL expression type, which most commonly is an instant vector or range vector of time series.
+[PromQLエンジン](https://github.com/prometheus/prometheus/blob/v2.3.1/promql/engine.go#L164-L171)は、[PromQL expression queries](https://prometheus.io/docs/prometheus/latest/querying/basics/)のPrometheusの時系列データベースに対して評価する役割を担っている。
+このエンジンはそれ自身アクターのgoroutineとして動作せず、webインターフェースとルールマネージャーからライブラリとして利用される。
+PromQLの評価は、複数の段階を経る。クエリが作成されると、その式は抽象的な構文木へとパースされ、実行可能なクエリとなる。
+後続の実行段階では、背後のストレージから得られる必要な時系列を検索し、そのためのイテレーターを作成する。
+時系列の大量データの実際の取得は、（少なくともローカルのTSDBの場合は）評価時に行われる。
+式の評価は、PromQLの式の型（ほとんどの場合はinstant vectorまたはrange vector）を返す。
 
 ## Rule manager
 
-The rule manager is a [`rules.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/rules/manager.go#L410-L418) that is responsible for evaluating recording and alerting rules on a periodic basis (as configured using the `evaluation_interval` configuration file setting). It evaluates all rules on every iteration using PromQL and writes the resulting time series back into the storage.
+rule managerは、[`rules.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/rules/manager.go#L410-L418)であり、（設定ファイルの`evaluation_interval`で設定されているように）定期的なレコーディングルールとアラートルールの評価をする役割を担っている。
+各繰り返しで、PromQLを利用して全てのルールを評価し、結果の時系列をストレージに書き込む。
 
-For alerting rules, the rule manager performs several actions on every iteration:
+アラートルールに関しては、rule managerは、以下のように、各繰り返しでいくつかのことを行う。
 
-- It stores the series `ALERTS{alertname="<alertname>", <alert labels>}` for any pending or firing alerts.
-- It tracks the lifecycle state of active alerts to decide when to transition an alert from pending to firing (depending on the `for` duration in the alerting rule).
-- It expands the label and annotation templates from the alerting rule for each active alert.
-- It sends firing alerts to the notifier (see below) and keeps sending resolved alerts for 15 minutes.
+- pendingまたはfiringのアラートに対して時系列`ALERTS{alertname="<alertname>", <alert labels>}`を保存する
+- アラートルールの`for`の時間に基づいて、pendingからfiringにいつ遷移するか決めるためにactiveなアラートのライフサイクルの状態を追跡する
+- activeなアラートそれぞれに対してアラートルールのラベルとアノテーションのテンプレートを展開する
+- firingなアラートをnotifierに送り（下記参照）、解消したアラートは15分間送り続ける
 
 ## Notifier
 
-The notifier is a [`notifier.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/notifier/notifier.go#L104-L119) that takes alerts generated by the rule manager via its `Send()` method, enqueues them, and forwards them to all configured Alertmanager instances. The notifier serves to decouple generation of alerts from dispatching them to Alertmanager (which may fail or take time).
+notifierは、[`notifier.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/notifier/notifier.go#L104-L119)であり、rule managerが生成したアラートを`Send()`メソッドで受け取り、キューに入れ、設定されたAlertmanagerインスタンス全てに送信する。
+notifierは、アラートの生成とアラートのAlertmanagerへの送信（失敗したり時間がかかったりする）を分離する役割を果たす。
 
 ## Notifier discovery
 
-The notifier discovery manager is a [`discovery.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/manager.go#L73-L89) that uses Prometheus's service discovery functionality to find and continuously update the list of Alertmanager instances that the notifier should send alerts to. It runs independently of the notifier manager and feeds it with a stream of target group updates over a [synchronization channel](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L587).
+notifier discovery managerは、[`discovery.Manager`](https://github.com/prometheus/prometheus/blob/v2.3.1/discovery/manager.go#L73-L89)であり、Prometheusのサービスディスカバリーの機能を利用して、notifierがアラートを送るAlertmanagerのインスタンスのリストを検索し継続的に更新する。
+notifier discovery managerは、notifier managerとは独立して動作し、[synchronization channel](https://github.com/prometheus/prometheus/blob/v2.3.1/cmd/prometheus/main.go#L587)を通してtarget groupの更新を次々にnotifier managerに送信する。
 
-Internally it works like the scrape discovery manager.
+内部的には、scrape discovery managerと同様な仕組みで動作する。
 
 ## Web UI and API
 
-Prometheus serves its web UI and API on port `9090` by default. The web UI is available at `/` and serves a human-usable interface for running expression queries, inspecting active alerts, or getting other insight into the status of the Prometheus server.
+Prometheusは、デフォルトでは`9090`ポートでweb UIとAPIを提供する。
+web UIは`/`で利用可能であり、クエリを実行したり、activeなアラートを調査したり、その他のPrometheusサーバーの状態を理解するために人間が利用するインターフェースとして機能する。
 
-The web API is served under `/api/v1` and allows programmatical [querying, metadata, and server status inspection](https://prometheus.io/docs/prometheus/latest/querying/api/).
+web APIは、`/api/v1`で提供され、[クエリ、メタデータ、サーバーの状態をプログラムで調べる](https://prometheus.io/docs/prometheus/latest/querying/api/)ことを可能にしている。
 
-[Console templates](https://prometheus.io/docs/visualization/consoles/), which allow Prometheus to serve user-defined HTML templates that have access to TSDB data, are served under `/consoles` when console templates are present and configured.
+コンソールテンプレートは、TSDBデータにアクセスできるユーザー定義のHTMLテンプレートをPrometheusが提供出来るようにするものであり、設定されていれば`/consoles`で利用可能である。
