@@ -119,4 +119,4 @@ Prometheusのリモートストレージ連携の設定に関する詳細は、P
 
 ### 既存の連携
 
-リモートストレージとの既存の連携についてさらに学ぶには、[インテグレーション](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage)のドキュメントを参照すること。
+リモートストレージとの既存の連携についてさらに学ぶには、[インテグレーション](https://prometheus.io/ja/docs/operating/integrations/#remote-endpoints-and-storage)のドキュメントを参照すること。

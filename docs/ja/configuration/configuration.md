@@ -590,7 +590,7 @@ JSONファイルは、下記のフォーマットで`static_config`のリスト�
 各監視対象は、[リラベルの過程](#relabel_config)でメタラベル`__meta_filepath`を持つ。
 その値は、その監視対象が抽出されたファイルパスがセットされる。
 
-この検出の仕組みとの[連携システムの一覧](https://prometheus.io/docs/operating/integrations/#file-service-discovery)がある。
+この検出の仕組みとの[連携システムの一覧](https://prometheus.io/ja/docs/operating/integrations/#file-service-discovery)がある。
 
 ```yaml
 # 対象グループを抽出するファイルのパターン
