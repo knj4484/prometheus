@@ -13,6 +13,7 @@ sort_rank: 1
 ## Prometheusのダウンロードと実行
 
 自分のプラットフォームに合った[Prometheusの最新リリース](https://prometheus.io/download)をダウンロードし、展開、実行する
+
 ```bash
 tar xvfz prometheus-*.tar.gz
 cd prometheus-*
