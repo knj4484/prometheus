@@ -1,6 +1,6 @@
 ---
 title: APIの安定性
-sort_rank: 8
+sort_rank: 9
 ---
 
 # APIの安定性保証

@@ -35,23 +35,24 @@ Prometheusサーバーは、フェデレーションによって、他のPrometh
 それぞれの`match[]`の引数は、`up`や`{job="api-server"}`のような[instance vector selector](querying/basics.md#instant-vector-selectors)を指定しなければいけない。
 
 あるサーバーから他のサーバーにメトリクスをfederateするためには、受け取り側のPrometheusサーバーが提供側のPrometheusサーバーのエンドポイント`/federate`をスクレイプするようにすると同時に、取得したラベルを上書きしないように`honor_labels`を有効にし、必要な`match[]`パラメーターを渡すように設定すること。
-例えば、以下の`scrape_config`は、ラベルが`job="prometheus"`またはメトリック名が`job:`で始まる時系列データを`source-prometheus-{1,2,3}:9090`から取得する。
+例えば、以下の`scrape_configs`は、ラベルが`job="prometheus"`またはメトリック名が`job:`で始まる時系列データを`source-prometheus-{1,2,3}:9090`から取得する。
 
 ```yaml
-- job_name: 'federate'
-  scrape_interval: 15s
+scrape_configs:
+  - job_name: 'federate'
+    scrape_interval: 15s
 
-  honor_labels: true
-  metrics_path: '/federate'
+    honor_labels: true
+    metrics_path: '/federate'
 
-  params:
-    'match[]':
-      - '{job="prometheus"}'
-      - '{__name__=~"job:.*"}'
+    params:
+      'match[]':
+        - '{job="prometheus"}'
+        - '{__name__=~"job:.*"}'
 
-  static_configs:
-    - targets:
-      - 'source-prometheus-1:9090'
-      - 'source-prometheus-2:9090'
-      - 'source-prometheus-3:9090'
+    static_configs:
+      - targets:
+        - 'source-prometheus-1:9090'
+        - 'source-prometheus-2:9090'
+        - 'source-prometheus-3:9090'
 ```

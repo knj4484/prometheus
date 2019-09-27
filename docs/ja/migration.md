@@ -1,6 +1,6 @@
 ---
 title: 移行
-sort_rank: 7
+sort_rank: 8
 ---
 
 # Prometheus 2.0移行ガイド
@@ -129,8 +129,7 @@ $ ./prometheus-1.8.1.linux-amd64/prometheus -web.listen-address ":9094" -config.
 $ ./prometheus-2.0.0.linux-amd64/prometheus --config.file prometheus.yml
 ```
 
-`prometheus.yml`が既存の完全な設定XXX
-Where `prometheus.yml` contains in addition to your full existing configuration, the stanza:
+ここで、`prometheus.yml`は、既存の設定全てに加えて、次のような行を含んでいる。
 
 ```yaml
 remote_read:
@@ -143,13 +142,7 @@ remote_read:
 
 - `drop_common_labels`関数 - `without`集約修飾子を代わりに使うべきである
 - `keep_common`集約修飾子 - `by`修飾子を代わりに使うべきである
-- `count_scalar`関数 - `absent()`の方がうまく処理できる。演算でラベルをXXX
-
-- `drop_common_labels` function - the `without` aggregation modifier should be used
-  instead.
-- `keep_common` aggregation modifier - the `by` modifier should be used instead.
-- `count_scalar` function - use cases are better handled by `absent()` or correct
-  propagation of labels in operations.
+- `count_scalar`関数 - `absent()`または演算でラベルの伝搬を修正する方がうまく処理できる
 
 詳細は、[issue #3060](https://github.com/prometheus/prometheus/issues/3060)を参照。
 
